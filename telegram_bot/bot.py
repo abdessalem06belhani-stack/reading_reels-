@@ -308,18 +308,28 @@ def _health_server(port: int):
 
 # ── polling with conflict retry ───────────────────────────────
 async def _poll_forever(app: Application):
-    """Run polling forever, retrying automatically on Telegram Conflict."""
+    """Run polling forever, retrying automatically on any error with backoff."""
     await app.initialize()
+    retry_delay = 1
+    max_delay = 60
     while True:
         try:
             task = await app.updater.start_polling(
                 drop_pending_updates=True,
                 allowed_updates=["message", "callback_query"],
             )
-            await task  # blocks until polling fails (Conflict, etc.)
+            await task
+            retry_delay = 1
         except telegram.error.Conflict:
             print("⚠️ Conflict — retrying in 30s")
             await asyncio.sleep(30)
+        except Exception as e:
+            import traceback
+            print(f"⚠️ Polling error: {e}")
+            traceback.print_exc()
+            print(f"⏳ Retrying in {retry_delay}s...")
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, max_delay)
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -356,17 +366,21 @@ def main():
         )
         return
 
-    # ── Railway without public domain → health server + polling ──
+    # ── Railway without public domain → health server (main) + polling (bg thread) ──
     if railway_port:
-        t = threading.Thread(target=_health_server, args=(int(railway_port),), daemon=True)
+        t = threading.Thread(target=lambda: asyncio.run(_poll_forever(app)), daemon=True)
         t.start()
-        print(f"🏥 health → 0.0.0.0:{railway_port}  |  polling with conflict recovery")
+        print(f"🏥 health → 0.0.0.0:{railway_port}  |  polling in background thread")
+        _health_server(int(railway_port))
+        return
 
-    # ── Local or Railway polling ──
+    # ── Local polling ──
     try:
         asyncio.run(_poll_forever(app))
-    except Exception:
-        print("Fatal error, exiting.")
+    except Exception as e:
+        import traceback
+        print(f"Fatal error, exiting: {e}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
