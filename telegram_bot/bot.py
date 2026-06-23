@@ -6,6 +6,7 @@ Start:  python -m telegram_bot.bot
 """
 from __future__ import annotations
 import os, asyncio, threading, tempfile
+import telegram
 from collections import defaultdict
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -365,7 +366,6 @@ def main():
         print(f"🏥 health → 0.0.0.0:{railway_port}  |  polling with conflict recovery")
 
     # ── Local or Railway polling ──
-    import telegram
     try:
         asyncio.run(_poll_forever(app))
     except telegram.error.Conflict:
