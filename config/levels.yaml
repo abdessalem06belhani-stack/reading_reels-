@@ -1,0 +1,51 @@
+# CEFR reading levels. The timing engine uses words_per_minute to fit ~2 min.
+# max_words_per_line keeps lines short enough to read in one glance (retention).
+A1:
+  name: "Beginner"
+  max_words_per_line: 5
+  target_lines: 16
+  words_per_minute: 70        # very slow, deliberate
+  vocabulary: "the 500 most common English words, present simple only"
+  sentence_style: "very short, concrete, one idea per sentence"
+  hook: "a familiar daily-life moment (waking up, coffee, going to school)"
+  ending: "a calm, complete thought that gently invites a re-watch"
+
+A2:
+  name: "Elementary"
+  max_words_per_line: 7
+  target_lines: 18
+  words_per_minute: 85
+  vocabulary: "common 1000-1500 words, present + past simple"
+  sentence_style: "short, clear, simple connectors (and, but, because)"
+  hook: "a small relatable problem or wish"
+  ending: "a light, satisfying resolution"
+
+B1:
+  name: "Intermediate"
+  max_words_per_line: 9
+  target_lines: 20
+  words_per_minute: 100
+  vocabulary: "everyday + common abstract words, mixed tenses"
+  sentence_style: "medium length, some subordinate clauses"
+  hook: "a question or mild tension the reader wants resolved"
+  ending: "a reflective line that lands the idea"
+
+B2:
+  name: "Upper-Intermediate"
+  max_words_per_line: 11
+  target_lines: 22
+  words_per_minute: 120
+  vocabulary: "richer vocabulary, idioms used sparingly, varied tenses"
+  sentence_style: "flowing sentences, controlled complexity"
+  hook: "an intriguing claim or contrast"
+  ending: "a thoughtful, slightly open-ended payoff"
+
+C1:
+  name: "Advanced"
+  max_words_per_line: 13
+  target_lines: 24
+  words_per_minute: 140
+  vocabulary: "precise, nuanced, advanced collocations"
+  sentence_style: "sophisticated, rhythmic, well-structured"
+  hook: "a sharp insight or paradox"
+  ending: "a memorable, quotable final line"

@@ -1,0 +1,42 @@
+# Topic families rotated to avoid repetition across videos.
+# The scheduler/pipeline rotates through these so each upload feels fresh.
+families:
+  daily_life:
+    - "a quiet morning routine"
+    - "making coffee and starting the day"
+    - "a walk in the neighborhood"
+    - "cooking a simple dinner at home"
+  work:
+    - "the first day at a new job"
+    - "staying focused during a busy week"
+    - "a small win at work"
+    - "learning a new skill for your career"
+  travel:
+    - "arriving in a new city for the first time"
+    - "a slow afternoon by the sea"
+    - "getting lost and finding something beautiful"
+    - "a train ride through the countryside"
+  study:
+    - "building a daily study habit"
+    - "why reading every day changes you"
+    - "how to remember new words"
+    - "studying late but staying calm"
+  motivation:
+    - "small steps that lead to big change"
+    - "being patient with your progress"
+    - "why consistency beats intensity"
+    - "starting again after a setback"
+  micro_story:
+    - "a stranger who changed someone's day"
+    - "a letter found years later"
+    - "the night the city went quiet"
+    - "a promise kept after a long time"
+
+# Visual mood queries paired with topic families (sent to the stock APIs).
+mood_queries:
+  daily_life: ["cozy home morning", "soft sunlight window", "calm minimal interior"]
+  work:       ["minimal desk workspace", "city office sunrise", "focused study desk"]
+  travel:     ["calm ocean horizon", "misty mountains", "quiet european street"]
+  study:      ["open book soft light", "library aesthetic", "rain on window study"]
+  motivation: ["sunrise over mountains", "calm forest path", "runner at dawn"]
+  micro_story: ["moody city night", "lonely lighthouse", "warm cafe evening"]

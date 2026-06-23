@@ -1,0 +1,21 @@
+# ---- Core (required) ----
+moviepy>=2.0.0            # high-level video helpers (optional path)
+imageio-ffmpeg>=0.5.1     # ships a static ffmpeg binary, no system install needed
+Pillow>=10.0.0            # text strip + gradient rendering
+numpy>=1.24.0             # gradient/noise math
+requests>=2.31.0          # NVIDIA NIM + Pexels/Pixabay HTTP calls
+PyYAML>=6.0               # config files
+python-dotenv>=1.0.0      # load .env
+
+# ---- Text-to-speech (optional, free) ----
+gTTS>=2.5.0               # online, very natural, free (needs internet)
+pyttsx3>=2.90             # offline fallback TTS (no internet, robotic)
+
+# ---- Auto-upload to TikTok (optional) ----
+selenium>=4.15.0          # browser-automation upload (uses your own Chrome login)
+
+# ---- Telegram bot ----
+python-telegram-bot>=20.0.0
+
+# ---- Nice to have ----
+rich>=13.0.0              # pretty CLI logs

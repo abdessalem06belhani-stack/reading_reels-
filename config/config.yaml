@@ -1,0 +1,95 @@
+# =====================================================================
+#  Master configuration for reading_reels
+# =====================================================================
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  duration_sec: 120        # ~2 minutes, tuned per video by the timing engine
+  crf: 20                  # H.264 quality (lower = better/bigger). 18-23 sane range
+  preset: "medium"         # ffmpeg x264 preset
+  pix_fmt: "yuv420p"       # required for TikTok/most players
+
+text:
+  font_regular: "fonts/Lexend-Regular.ttf"   # auto-falls back to DejaVuSans if missing
+  font_bold:    "fonts/Lexend-Bold.ttf"
+  intro_font_size: 86
+  body_font_size: 60
+  line_spacing: 1.28       # multiplier of font size between wrapped sub-lines
+  block_spacing: 40        # extra px between separate sentences/blocks
+  side_margin: 96          # left/right safe margin in px
+  text_color: "#FFFFFF"
+  stroke_color: "#000000"
+  stroke_width: 6          # outline for contrast over any background
+  shadow: true
+  shadow_offset: 5
+  scroll_direction: "up"   # "up" (credit scroll) or "static"
+  start_offset_frac: 0.10  # where the top of the strip starts (fraction of height)
+  end_visible_frac: 0.80   # keep last line above this fraction at the end
+
+scrim:
+  enabled: true            # dark contrast layer between bg and text
+  opacity: 0.42            # 0..1 overall darkening
+  vignette: true           # stronger darkening top & bottom
+
+background:
+  source_priority: ["pexels", "pixabay", "gradient"]  # tried in order
+  media_type: "auto"       # "image", "video", or "auto" (prefer video then image)
+  orientation: "portrait"
+  kenburns: true           # slow zoom/pan on still images
+  kenburns_zoom: 1.10      # max zoom factor over the clip
+  cache_dir: "assets/cache"
+  dedup: true              # never reuse the same asset id twice (per account)
+
+audio:
+  intro_tts: true          # speak the two intro phrases
+  narrate_reading: false   # also speak every reading line (slower to produce)
+  tts_engine: "auto"       # "gtts" (online), "pyttsx3" (offline), or "auto"
+  tts_lang: "en"
+  tts_tld: "com"           # gTTS accent: com=US, co.uk=UK, com.au=AU, ca=CA
+  music_file: ""           # optional path to a royalty-free loop (.mp3/.m4a)
+  music_gain_db: -22       # background music level
+  voice_gain_db: 0
+  loudnorm: true           # EBU R128 normalization (-16 LUFS) via ffmpeg
+
+ai:
+  provider: "nvidia_nim"   # "nvidia_nim" or "local" (local = offline fallback bank)
+  base_url: "https://integrate.api.nvidia.com/v1"
+  model: "meta/llama-3.1-70b-instruct"
+  temperature: 0.8
+  max_tokens: 1200
+  timeout_sec: 60
+  retries: 2
+  fallback_to_local: true  # if NIM fails/has no key, use the local content engine
+
+intro_phrases:
+  - "Let's practice English"
+  - "Education is the key"
+
+# ---------------------------------------------------------------------
+#  Auto-upload to TikTok (optional). Disabled by default.
+#  See docs/UPLOAD_TIKTOK.md for full setup.
+# ---------------------------------------------------------------------
+upload:
+  enabled: false            # master switch (or pass --auto-upload on the CLI)
+  method: "web"             # "web" (browser automation) or "api" (official API)
+  web:
+    upload_url: "https://www.tiktok.com/tiktokstudio/upload"
+    chrome_profile_dir: "assets/chrome_profile"   # log in once; reused forever
+    headless: false         # keep false: TikTok blocks most headless uploads
+    keep_browser_open: false
+    post_button_timeout: 180
+    post_finalize_wait: 12
+    selectors:              # update these if TikTok changes its page
+      file_input: "input[type='file']"
+      caption: "div[contenteditable='true']"
+      post_button_xpath: "//button[.//div[contains(., 'Post')] or contains(., 'Post')]"
+  api:
+    access_token_env: "TIKTOK_ACCESS_TOKEN"   # env var holding the token
+    privacy_level: "SELF_ONLY"                # SELF_ONLY until your app is audited
+
+paths:
+  outputs: "outputs"
+  jobs: "outputs/jobs"
+  used_assets_db: "assets/used_assets.json"

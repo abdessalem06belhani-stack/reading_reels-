@@ -1,0 +1,39 @@
+# Multi-account content matrix. Each account = one educational identity.
+# The pipeline reads `level`, `topic_families` and `mood` to differentiate output.
+# NOTE: this tool PREPARES upload-ready packages (video + caption + hashtags).
+#       It does NOT auto-post (TikTok has no open public upload API for personal
+#       accounts; auto-posting risks policy violations). See docs/ACCOUNT_SETUP.md.
+
+accounts:
+  - id: "read_a1_daily"
+    display_name: "Easy English Reading"
+    level: "A1"
+    topic_families: ["daily_life", "study"]
+    region: "global"
+    audience: "absolute beginners"
+    style: "calm, warm, simple"
+    posting:
+      per_day: 2
+      best_times: ["08:00", "19:00"]
+
+  - id: "read_b1_motivation"
+    display_name: "Read & Grow English"
+    level: "B1"
+    topic_families: ["motivation", "work", "study"]
+    region: "global"
+    audience: "intermediate learners"
+    style: "uplifting, modern"
+    posting:
+      per_day: 2
+      best_times: ["09:00", "20:00"]
+
+  - id: "read_b2_stories"
+    display_name: "English Reading Stories"
+    level: "B2"
+    topic_families: ["micro_story", "travel"]
+    region: "global"
+    audience: "upper-intermediate learners"
+    style: "cinematic, reflective"
+    posting:
+      per_day: 1
+      best_times: ["21:00"]
