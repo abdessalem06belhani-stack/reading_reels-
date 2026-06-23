@@ -289,6 +289,41 @@ async def run_generation(callback_query, chat_id):
     )
 
 
+# ── health server (Railway port detection) ────────────────────
+def _health_server(port: int):
+    """Minimal HTTP server so Railway detects this as a web service."""
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+        def log_message(self, *a): pass
+    try:
+        HTTPServer(("0.0.0.0", port), H).serve_forever()
+    except Exception as e:
+        print(f"health server: {e}")
+
+
+# ── polling with conflict retry ───────────────────────────────
+async def _poll_forever(app: Application):
+    """Run polling forever, retrying automatically on Telegram Conflict."""
+    for attempt in range(1, 10000):
+        try:
+            await app.updater.start_polling(
+                drop_pending_updates=True,
+                allowed_updates=["message", "callback_query"],
+            )
+            # poll is alive — just keep the loop running
+            while app.updater.running:
+                await asyncio.sleep(5)
+        except telegram.error.Conflict:
+            print(f"⚠️ Conflict (attempt {attempt}) — retrying in 30s")
+            await asyncio.sleep(30)
+        except Exception:
+            raise
+
+
 # ── main ──────────────────────────────────────────────────────
 def main():
     global cfg
@@ -304,13 +339,15 @@ def main():
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
-    # Railway webhook mode (no conflict)  vs  local polling
+    railway_port = os.getenv("PORT")
     railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL")
-    if railway_domain:
-        port = int(os.getenv("PORT", "8080"))
+
+    # ── On Railway with public domain → webhook (best, no conflicts) ──
+    if railway_port and railway_domain:
+        port = int(railway_port)
         url_path = f"/webhook/{token}"
         webhook_url = f"https://{railway_domain}{url_path}"
-        print(f"Starting webhook on 0.0.0.0:{port} → {webhook_url}")
+        print(f"🌐 webhook 0.0.0.0:{port} → {webhook_url}")
         app.run_webhook(
             listen="0.0.0.0",
             port=port,
@@ -319,9 +356,20 @@ def main():
             secret_token=token,
             drop_pending_updates=True,
         )
-    else:
-        print("Bot is running... Press Ctrl+C to stop.")
-        app.run_polling(drop_pending_updates=True, allowed_updates=["message", "callback_query"])
+        return
+
+    # ── Railway without public domain → health server + polling ──
+    if railway_port:
+        t = threading.Thread(target=_health_server, args=(int(railway_port),), daemon=True)
+        t.start()
+        print(f"🏥 health → 0.0.0.0:{railway_port}  |  polling with conflict recovery")
+
+    # ── Local or Railway polling ──
+    import telegram
+    try:
+        asyncio.run(_poll_forever(app))
+    except telegram.error.Conflict:
+        print("Conflict too many times, giving up.")
 
 
 if __name__ == "__main__":

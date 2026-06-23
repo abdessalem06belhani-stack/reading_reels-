@@ -5,6 +5,8 @@
   },
   "deploy": {
     "startCommand": "python -m app.main bot",
-    "restartPolicyType": "ALWAYS"
+    "restartPolicyType": "ALWAYS",
+    "healthcheckPath": "/",
+    "port": 8080
   }
 }
