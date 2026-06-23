@@ -11,8 +11,13 @@ from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
+from dotenv import load_dotenv
+
 from app.config_loader import load_config
 from app.pipeline import Pipeline
+
+# Load .env BEFORE reading env vars (supports both local .env and Railway OS env)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
