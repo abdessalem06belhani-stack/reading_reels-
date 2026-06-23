@@ -90,6 +90,12 @@ def cmd_upload(cfg, args):
     print(json.dumps(res, indent=2))
 
 
+def cmd_bot(cfg, args):
+    """Launch the Telegram bot (interactive video generation)."""
+    from telegram_bot.bot import main as bot_main
+    bot_main()
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="reading_reels",
                                 description="Free-first TikTok English reading video generator")
@@ -124,6 +130,9 @@ def build_parser():
     u.add_argument("--caption-file", default=None)
     u.add_argument("--caption", default=None)
     u.set_defaults(fn=cmd_upload)
+
+    b = sub.add_parser("bot", help="launch the Telegram bot")
+    b.set_defaults(fn=cmd_bot)
     return p
 
 
