@@ -304,8 +304,24 @@ def main():
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
-    print("Bot is running... Press Ctrl+C to stop.")
-    app.run_polling(drop_pending_updates=True)
+    # Railway webhook mode (no conflict)  vs  local polling
+    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL")
+    if railway_domain:
+        port = int(os.getenv("PORT", "8080"))
+        url_path = f"/webhook/{token}"
+        webhook_url = f"https://{railway_domain}{url_path}"
+        print(f"Starting webhook on 0.0.0.0:{port} → {webhook_url}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=url_path,
+            webhook_url=webhook_url,
+            secret_token=token,
+            drop_pending_updates=True,
+        )
+    else:
+        print("Bot is running... Press Ctrl+C to stop.")
+        app.run_polling(drop_pending_updates=True, allowed_updates=["message", "callback_query"])
 
 
 if __name__ == "__main__":
