@@ -9,6 +9,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Force cache invalidation — increment on each deploy
+RUN echo "deploy-v2" > /deploy-marker
+
 COPY . .
 
 # Run the Telegram bot (interactive, polling mode)
