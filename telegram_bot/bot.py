@@ -248,7 +248,10 @@ async def status_cmd(update: Update, ctx, edit=False):
         f"الموضوع: {'عشوائي' if not topic else topic}\n"
     )
     if edit:
-        await update.callback_query.edit_message_text(text, reply_markup=main_menu(), parse_mode="Markdown")
+        try:
+            await update.callback_query.edit_message_text(text, reply_markup=main_menu(), parse_mode="Markdown")
+        except Exception:
+            pass
     else:
         await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -302,7 +305,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     print("Bot is running... Press Ctrl+C to stop.")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
