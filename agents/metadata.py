@@ -13,7 +13,14 @@ def build_metadata(script: Dict, account: Dict | None = None) -> Dict:
     level = script.get("level", "B1")
     title = script.get("title", "English Reading")
     caption = script.get("caption") or f"{title} — read along with me. {script['lines'][0]}"
-    tags = list(dict.fromkeys((script.get("hashtags") or []) + _BASE_TAGS + [_LEVEL_TAGS.get(level, "")]))
+
+    # Defensive normalization: some providers may return hashtags as a string.
+    raw_tags = script.get("hashtags") or []
+    if isinstance(raw_tags, str):
+        raw_tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+
+    tags = list(dict.fromkeys(list(raw_tags) + _BASE_TAGS + [_LEVEL_TAGS.get(level, "")]))
+
     tags = [t for t in tags if t]
     fname = f"{level.lower()}_{slugify(title)}"
     return {
