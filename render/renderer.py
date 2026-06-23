@@ -231,8 +231,10 @@ class Renderer:
         args = [*inputs, *extra,
                 "-filter_complex", filter_complex,
                 "-map", "[outv]", "-map", alabel,
-                "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(self.crf),
                 "-pix_fmt", self.pix_fmt, "-r", str(fps),
+                "-threads", "1",
+                "-max_muxing_queue_size", "1024",
                 "-c:a", "aac", "-b:a", "192k",
                 "-t", str(duration), "-movflags", "+faststart",
                 str(out_mp4)]
@@ -248,8 +250,10 @@ class Renderer:
                 *inputs, *extra,
                 "-filter_complex", fc_yuv,
                 "-map", "[outv]", "-map", alabel,
-                "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(self.crf),
                 "-pix_fmt", self.pix_fmt, "-r", str(fps),
+                "-threads", "1",
+                "-max_muxing_queue_size", "1024",
                 "-c:a", "aac", "-b:a", "192k",
                 "-t", str(duration), "-movflags", "+faststart",
                 str(out_mp4)]
