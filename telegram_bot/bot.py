@@ -314,15 +314,21 @@ async def _poll_forever(app: Application):
     max_delay = 60
     while True:
         try:
-            task = await app.updater.start_polling(
+            await app.updater.start_polling(
                 drop_pending_updates=True,
                 allowed_updates=["message", "callback_query"],
             )
-            await task
             retry_delay = 1
+            while True:
+                await asyncio.sleep(3600)
         except telegram.error.Conflict:
             print("⚠️ Conflict — retrying in 30s")
             await asyncio.sleep(30)
+            retry_delay = 1
+            try:
+                await app.updater.stop()
+            except Exception:
+                pass
         except Exception as e:
             import traceback
             print(f"⚠️ Polling error: {e}")
@@ -330,6 +336,10 @@ async def _poll_forever(app: Application):
             print(f"⏳ Retrying in {retry_delay}s...")
             await asyncio.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, max_delay)
+            try:
+                await app.updater.stop()
+            except Exception:
+                pass
 
 
 # ── main ──────────────────────────────────────────────────────
