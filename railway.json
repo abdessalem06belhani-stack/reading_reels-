@@ -1,13 +1,6 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "deploy/Dockerfile"
-  },
-  "deploy": {
-    "startCommand": "python -m telegram_bot.bot",
-    "restartPolicyType": "ALWAYS",
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 300
+    "dockerfilePath": "Dockerfile"
   }
 }
