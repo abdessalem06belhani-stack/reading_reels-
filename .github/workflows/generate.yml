@@ -1,0 +1,89 @@
+name: generate-reading-videos
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'CEFR Level'
+        required: true
+        default: 'B1'
+        type: choice
+        options: [A1, A2, B1, B2, C1]
+      topic:
+        description: 'Topic (leave blank for random)'
+        required: false
+        default: ''
+        type: string
+      count:
+        description: 'Number of videos'
+        required: true
+        default: '1'
+        type: choice
+        options: ['1', '2', '3', '5', '10']
+      send_telegram:
+        description: 'Send result to Telegram'
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    - cron: "0 7 * * *"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore dedup DB
+        uses: actions/cache@v4
+        with:
+          path: assets/used_assets.json
+          key: used-assets-${{ github.run_id }}
+          restore-keys: used-assets-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+
+      - name: Doctor check
+        run: python -m app.main doctor
+
+      - name: Generate videos
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TOPIC_ARG=""
+            if [ -n "${{ inputs.topic }}" ]; then
+              TOPIC_ARG="--topic \"${{ inputs.topic }}\""
+            fi
+            python -m app.main batch --count ${{ inputs.count }} --level ${{ inputs.level }} $TOPIC_ARG
+          else
+            python -m app.main accounts
+          fi
+
+      - name: Send to Telegram
+        if: github.event_name == 'workflow_dispatch' && fromJSON(inputs.send_telegram)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          for dir in outputs/jobs/*/; do
+            python telegram_sender.py --dir "$dir"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-videos-${{ github.run_id }}
+          path: outputs/jobs/**
+          retention-days: 30
