@@ -309,20 +309,17 @@ def _health_server(port: int):
 # ── polling with conflict retry ───────────────────────────────
 async def _poll_forever(app: Application):
     """Run polling forever, retrying automatically on Telegram Conflict."""
-    for attempt in range(1, 10000):
+    await app.initialize()
+    while True:
         try:
-            await app.updater.start_polling(
+            task = await app.updater.start_polling(
                 drop_pending_updates=True,
                 allowed_updates=["message", "callback_query"],
             )
-            # poll is alive — just keep the loop running
-            while app.updater.running:
-                await asyncio.sleep(5)
+            await task  # blocks until polling fails (Conflict, etc.)
         except telegram.error.Conflict:
-            print(f"⚠️ Conflict (attempt {attempt}) — retrying in 30s")
+            print("⚠️ Conflict — retrying in 30s")
             await asyncio.sleep(30)
-        except Exception:
-            raise
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -368,8 +365,8 @@ def main():
     # ── Local or Railway polling ──
     try:
         asyncio.run(_poll_forever(app))
-    except telegram.error.Conflict:
-        print("Conflict too many times, giving up.")
+    except Exception:
+        print("Fatal error, exiting.")
 
 
 if __name__ == "__main__":
