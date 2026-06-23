@@ -310,6 +310,8 @@ def _health_server(port: int):
 async def _poll_forever(app: Application):
     """Run polling forever, retrying automatically on any error with backoff."""
     await app.initialize()
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    await app.start()
     retry_delay = 1
     max_delay = 60
     while True:

@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Force cache invalidation — increment on each deploy
-RUN echo "deploy-v3" > /deploy-marker
+RUN echo "deploy-v4" > /deploy-marker
 
 COPY . .
 
