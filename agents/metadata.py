@@ -9,14 +9,31 @@ _LEVEL_TAGS = {"A1": "#beginnerenglish", "A2": "#elementaryenglish",
                "B1": "#intermediateenglish", "B2": "#upperintermediate",
                "C1": "#advancedenglish"}
 
-def build_metadata(script: Dict, account: Dict | None = None) -> Dict:
+def build_metadata(script: Dict, account: Dict | None = None,
+                   title_override: str | None = None,
+                   caption_override: str | None = None,
+                   hashtags_override: str | None = None) -> Dict:
     level = script.get("level", "B1")
     title = script.get("title", "English Reading")
-    caption = script.get("caption")
+    if title_override:
+        title = str(title_override).strip() or title
+
+    caption = caption_override if caption_override is not None else script.get("caption")
     if caption is None:
         caption = f"{title} — read along with me. {script['lines'][0]}"
     caption = str(caption).strip()
-    tags = list(dict.fromkeys((script.get("hashtags") or []) + _BASE_TAGS + [_LEVEL_TAGS.get(level, "")]))
+
+    user_tags = []
+    if hashtags_override:
+        if isinstance(hashtags_override, str):
+            user_tags = [t.strip() for t in hashtags_override.split(",") if t.strip()]
+        elif isinstance(hashtags_override, list):
+            user_tags = [str(t).strip() for t in hashtags_override if str(t).strip()]
+
+    script_tags = script.get("hashtags") or []
+    if isinstance(script_tags, str):
+        script_tags = [script_tags]
+    tags = list(dict.fromkeys(user_tags + script_tags + _BASE_TAGS + [_LEVEL_TAGS.get(level, "")]))
     tags = [t for t in tags if t]
     fname = f"{level.lower()}_{slugify(title)}"
     return {

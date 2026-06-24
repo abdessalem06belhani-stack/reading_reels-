@@ -1,0 +1,140 @@
+name: TikTok review & publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'CEFR level'
+        required: true
+        default: 'B1'
+        type: choice
+        options: [A1, A2, B1, B2, C1]
+      topic:
+        description: 'Topic for the video, leave blank for random'
+        required: false
+        default: ''
+        type: string
+      title:
+        description: 'Optional TikTok video title'
+        required: false
+        default: ''
+        type: string
+      caption:
+        description: 'Optional TikTok caption text'
+        required: false
+        default: ''
+        type: string
+      hashtags:
+        description: 'Optional comma-separated hashtags'
+        required: false
+        default: ''
+        type: string
+      privacy:
+        description: 'Optional TikTok privacy level (SELF_ONLY or PUBLIC_TO_EVERYONE)'
+        required: false
+        default: 'SELF_ONLY'
+        type: choice
+        options: [SELF_ONLY, PUBLIC_TO_EVERYONE]
+      disable_comment:
+        description: 'Disable comments on TikTok upload'
+        required: false
+        default: false
+        type: boolean
+      disable_duet:
+        description: 'Disable duet on TikTok upload'
+        required: false
+        default: false
+        type: boolean
+      disable_stitch:
+        description: 'Disable stitch on TikTok upload'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+
+      - name: Generate review package
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          TOPIC_ARG=''
+          if [ -n "${{ inputs.topic }}" ]; then
+            TOPIC_ARG="--topic '${{ inputs.topic }}'"
+          fi
+          python -m app.main one --level ${{ inputs.level }} $TOPIC_ARG \
+            --title "${{ inputs.title }}" \
+            --caption "${{ inputs.caption }}" \
+            --hashtags "${{ inputs.hashtags }}"
+
+      - name: Upload review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-tiktok-package-${{ github.run_id }}
+          path: outputs/jobs/**
+          retention-days: 30
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: tiktok-review
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+
+      - name: Download review artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reading-tiktok-package-${{ github.run_id }}
+          path: review_artifact
+
+      - name: Find package video and caption
+        run: |
+          set -e
+          latest=$(find review_artifact -type f -name '*.mp4' | sort | tail -n 1)
+          if [ -z "$latest" ]; then
+            echo 'No video found' >&2
+            exit 1
+          fi
+          echo "VIDEO_PATH=$latest" >> $GITHUB_ENV
+          caption=$(find review_artifact -type f -name 'caption.txt' | sort | tail -n 1)
+          echo "CAPTION_FILE=$caption" >> $GITHUB_ENV
+
+      - name: Publish to TikTok
+        env:
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+        run: |
+          python -m app.main upload \
+            --video "$VIDEO_PATH" \
+            --caption-file "$CAPTION_FILE" \
+            --title "${{ inputs.title }}" \
+            --hashtags "${{ inputs.hashtags }}" \
+            --privacy "${{ inputs.privacy }}" \
+            $( [ "${{ inputs.disable_comment }}" = 'true' ] && echo --disable-comment ) \
+            $( [ "${{ inputs.disable_duet }}" = 'true' ] && echo --disable-duet ) \
+            $( [ "${{ inputs.disable_stitch }}" = 'true' ] && echo --disable-stitch )

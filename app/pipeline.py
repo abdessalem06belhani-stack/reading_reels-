@@ -42,7 +42,13 @@ class Pipeline:
     # ------------------------------------------------------------------
     def generate_one(self, level: str, topic: Optional[str] = None,
                      account: Optional[Dict] = None, seed: Optional[int] = None,
-                     with_audio: bool = True, auto_upload: bool = False) -> Dict:
+                     with_audio: bool = True, auto_upload: bool = False,
+                     title_override: str | None = None,
+                     caption_override: str | None = None,
+                     hashtags_override: str | None = None,
+                     duration: Optional[int] = None,
+                     text_color: Optional[str] = None,
+                     tts_speed: Optional[float] = None) -> Dict:
         rng = random.Random(seed)
         level_spec = self.cfg.levels.get(level)
         if not level_spec:
@@ -60,7 +66,7 @@ class Pipeline:
         lines = segment(script["lines"], max_words=10_000)
         # 3) timing
         intro = self.cfg.get("intro_phrases", default=["Let's practice English", "Education is the key"])
-        target = self.cfg.get("video", "duration_sec", default=120)
+        target = duration or self.cfg.get("video", "duration_sec", default=120)
         timing = build_timing(lines, level_spec.get("words_per_minute", 100), target)
         duration = float(min(max(timing["total"], target * 0.8), target * 1.2))
 
@@ -68,7 +74,10 @@ class Pipeline:
         background = self.bg.get(queries, account=(account or {}).get("id", "default"))
 
         # 5) build output job folder
-        meta = build_metadata(script, account)
+        meta = build_metadata(script, account,
+                              title_override=title_override,
+                              caption_override=caption_override,
+                              hashtags_override=hashtags_override)
         job_dir = ensure_dir(self.cfg.abspath(self.cfg.get("paths", "jobs", default="outputs/jobs"))
                              / f"{timestamp()}_{meta['filename']}")
 
@@ -82,7 +91,7 @@ class Pipeline:
         # 7) render
         strip_png = job_dir / "text_strip.png"
         scrim_png = job_dir / "scrim.png"
-        _, _, strip_h = self.renderer.build_text_strip(intro, lines, strip_png)
+        _, _, strip_h = self.renderer.build_text_strip(intro, lines, strip_png, text_color=text_color)
         self.renderer.build_scrim(scrim_png)
         out_mp4 = job_dir / f"{meta['filename']}.mp4"
         self.renderer.compose(background, strip_png, strip_h, scrim_png,
@@ -118,13 +127,30 @@ class Pipeline:
     # ------------------------------------------------------------------
     def generate_batch(self, count: int, level: Optional[str] = None,
                        account: Optional[Dict] = None, with_audio: bool = True,
-                       auto_upload: bool = False):
+                       auto_upload: bool = False,
+                       title_override: str | None = None,
+                       caption_override: str | None = None,
+                       hashtags_override: str | None = None,
+                       duration: Optional[int] = None,
+                       text_color: Optional[str] = None,
+                       tts_speed: Optional[float] = None):
         results = []
         for i in range(count):
             lvl = level or (account or {}).get("level") or random.choice(list(self.cfg.levels))
             try:
-                results.append(self.generate_one(lvl, account=account, seed=None,
-                                                  with_audio=with_audio, auto_upload=auto_upload))
+                results.append(self.generate_one(
+                    lvl,
+                    account=account,
+                    seed=None,
+                    with_audio=with_audio,
+                    auto_upload=auto_upload,
+                    title_override=title_override,
+                    caption_override=caption_override,
+                    hashtags_override=hashtags_override,
+                    duration=duration,
+                    text_color=text_color,
+                    tts_speed=tts_speed,
+                ))
             except Exception as e:
                 log.error("video %d/%d failed: %s", i + 1, count, e)
         return results
