@@ -67,7 +67,8 @@ class Renderer:
         self.H = v.get("height", 1920)
         self.fps = v.get("fps", 30)
         self.crf = v.get("crf", 20)
-        self.preset = v.get("preset", "medium")
+        # prefer faster presets by default to reduce encoding memory/CPU
+        self.preset = v.get("preset", "fast")
         self.pix_fmt = v.get("pix_fmt", "yuv420p")
         self.t = cfg.get("text", default={})
 
@@ -230,7 +231,9 @@ class Renderer:
         filter_complex = ";".join(vfilters + afilters)
         if alabel is None:
             raise RuntimeError("render failed: no audio track could be constructed")
+        # limit ffmpeg threading/filter threads to reduce peak memory usage
         args = [*inputs, *extra,
+            "-filter_threads", "1", "-threads", "1",
             "-filter_complex", filter_complex,
             "-map", "[outv]", "-map", alabel,
             "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),

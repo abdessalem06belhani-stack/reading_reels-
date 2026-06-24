@@ -37,6 +37,8 @@ def run_ffmpeg(args: list[str], desc: str = "ffmpeg"):
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         log.error("ffmpeg failed (exit %s)", proc.returncode)
+        if proc.returncode == -9:
+            log.error("ffmpeg was killed (exit -9) — likely OOM; consider using a faster preset or reducing resolution/filters.")
         if proc.stdout:
             log.error("ffmpeg stdout:\n%s", proc.stdout[-4000:])
         if proc.stderr:
