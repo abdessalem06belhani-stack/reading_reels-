@@ -82,6 +82,8 @@ def _apply_github_overrides(config: Dict[str, Any]) -> None:
     if mood_override := os.getenv("GH_MOOD_OVERRIDE"):
         # Store mood override for background agent to use
         config.setdefault("_overrides", {})["mood_query"] = mood_override
+    if use_slideshow := os.getenv("GH_USE_SLIDESHOW"):
+        config.setdefault("_overrides", {})["use_slideshow"] = use_slideshow.lower() == "true"
     
     # Audio/TTS overrides
     if enable_narration := os.getenv("GH_ENABLE_NARRATION"):

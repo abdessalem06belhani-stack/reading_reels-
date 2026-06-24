@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+import random
 
 from app.utils import get_logger, run_ffmpeg, ensure_dir
 
@@ -189,6 +190,12 @@ class Renderer:
         bg = self.cfg.get("background", default={})
         a = self.cfg.get("audio", default={})
         frames = int(duration * fps) + 1
+        
+        # Handle slideshow mode (multiple images)
+        if background["type"] == "slideshow":
+            return self._compose_slideshow(background, strip_png, strip_h,
+                                          scrim_png, duration, out_mp4, audio_path)
+        
         is_video = background["type"] == "video"
 
         inputs = []
@@ -244,3 +251,74 @@ class Renderer:
         ensure_dir(out_mp4.parent)
         run_ffmpeg(args, desc=f"render {out_mp4.name}")
         return out_mp4
+
+    def _compose_slideshow(self, background: Dict, strip_png: Path, strip_h: int,
+                           scrim_png: Path, duration: float, out_mp4: Path,
+                           audio_path: Optional[str] = None) -> Path:
+        """Compose a slideshow: images transition every ~5 seconds synchronized with script."""
+        W, H, fps = self.W, self.H, self.fps
+        a = self.cfg.get("audio", default={})
+        images = background.get("images", [])
+        
+        if not images:
+            log.warning("slideshow: no images provided, fallback to solid color")
+            bg_fallback = {"type": "image", "path": images[0] if images else str(self._gradient_single())}
+            return self.compose(bg_fallback, strip_png, strip_h, scrim_png, duration, out_mp4, audio_path)
+        
+        # Each image duration: ~5 seconds or divide by number of images
+        img_duration = max(5.0, duration / len(images))
+        
+        inputs = []
+        concat_vids = []
+        
+        # Build concat list: each image looped for img_duration + fade transition
+        for i, img_path in enumerate(images):
+            idx = i * 3  # 3 inputs per image: image + scrim + strip
+            inputs += ["-loop", "1", "-t", str(img_duration + 0.5), "-i", img_path]  # +0.5 for fade
+            inputs += ["-loop", "1", "-t", str(img_duration + 0.5), "-i", str(scrim_png)]
+            inputs += ["-loop", "1", "-t", str(img_duration + 0.5), "-i", str(strip_png)]
+            concat_vids.append(f"[{idx}]scale={W}:{H},fps={fps},setsar=1,format=rgba[bg{i}];")
+            concat_vids.append(f"[bg{i}][{idx+1}]overlay=0:0:format=auto[bgs{i}];")
+            yexpr = self._scroll_expr(strip_h, img_duration + 0.5)
+            concat_vids.append(f"[bgs{i}][{idx+2}]overlay=x=0:y='{yexpr}':eval=frame:format=auto[v{i}];")
+        
+        # Concatenate all video segments
+        concat_expr = "".join(concat_vids)
+        for i in range(len(images)):
+            concat_expr += f"[v{i}]"
+        concat_expr += f"concat=n={len(images)}:v=1[outv]"
+        
+        extra, afilters, alabel = self._audio_args(
+            audio_path, a.get("music_file") or None,
+            a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration)
+
+        filter_complex = concat_expr + ";" + ";".join(afilters)
+        
+        args = [*inputs, *extra,
+            "-filter_threads", "1", "-threads", "1",
+            "-filter_complex", filter_complex,
+            "-map", "[outv]", "-map", alabel,
+            "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
+            "-pix_fmt", self.pix_fmt, "-r", str(fps),
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            str(out_mp4)]
+        ensure_dir(out_mp4.parent)
+        log.info("slideshow: composing %d images, ~%ds per image", len(images), int(img_duration))
+        run_ffmpeg(args, desc=f"render slideshow {out_mp4.name}")
+        return out_mp4
+
+    def _gradient_single(self) -> Path:
+        """Generate a single gradient image as fallback."""
+        from agents.background import _PALETTES
+        top, bottom = random.choice(_PALETTES)
+        W, H = self.W, self.H
+        ty = np.linspace(0, 1, H)[:, None]
+        grad = np.zeros((H, W, 3), dtype=np.float32)
+        for c in range(3):
+            grad[..., c] = top[c] * (1 - ty) + bottom[c] * ty
+        grad = np.clip(grad, 0, 255).astype(np.uint8)
+        img = Image.fromarray(grad, "RGB")
+        out = Path("/tmp/gradient_fallback.jpg")
+        img.save(out, quality=92)
+        return out

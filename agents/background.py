@@ -62,7 +62,11 @@ class BackgroundProvider:
         return out
 
     # ------------------------------------------------------------------
-    def get(self, queries: List[str], account: str = "default") -> Dict:
+    def get(self, queries: List[str], account: str = "default", use_slideshow: bool = False) -> Dict:
+        """Get background: single video/image or multi-image slideshow (images change every ~5s)."""
+        if use_slideshow:
+            return self.get_slideshow(queries, account)
+        
         order = self.bg.get("source_priority", ["pexels", "pixabay", "gradient"])
         for src in order:
             try:
@@ -77,6 +81,38 @@ class BackgroundProvider:
             except Exception as e:
                 log.warning("background source %s failed: %s", src, e)
         return self._gradient(account)
+
+    def get_slideshow(self, queries: List[str], account: str = "default", num_images: int = 10) -> Dict:
+        """Fetch multiple images for slideshow mode (one per ~5 seconds, synced with script)."""
+        images = []
+        order = self.bg.get("source_priority", ["pexels", "pixabay", "gradient"])
+        
+        for _ in range(num_images):
+            for src in order:
+                try:
+                    if src == "pexels" and self.pexels_key:
+                        res = self._fetch_pexels_image(queries, account)
+                        if res:
+                            images.append(res)
+                            break
+                    elif src == "pixabay" and self.pixabay_key:
+                        res = self._fetch_pixabay_image(queries, account)
+                        if res:
+                            images.append(res)
+                            break
+                    elif src == "gradient":
+                        images.append(self._gradient(account)["path"])
+                        break
+                except Exception as e:
+                    log.warning("background source %s failed: %s", src, e)
+                    continue
+            
+            if not images or len(images) <= _:
+                # Fallback: add gradient if nothing else works
+                images.append(self._gradient(account)["path"])
+        
+        log.info("slideshow: fetched %d images (5 seconds each)", len(images))
+        return {"type": "slideshow", "images": images[:num_images], "source": "mixed"}
 
     # ---- Pexels -------------------------------------------------------
     def _from_pexels(self, queries, account) -> Optional[Dict]:
@@ -114,6 +150,24 @@ class BackgroundProvider:
                 return {"type": "image", "path": str(self._fit_image(path)), "source": src_tag}
         return None
 
+    def _fetch_pexels_image(self, queries, account) -> Optional[str]:
+        """Fetch a single Pexels image for slideshow mode."""
+        if not self.pexels_key:
+            return None
+        q = random.choice(queries)
+        headers = {"Authorization": self.pexels_key}
+        r = requests.get("https://api.pexels.com/v1/search", headers=headers, timeout=30,
+                         params={"query": q, "orientation": "portrait", "per_page": 15})
+        if r.ok:
+            for p in r.json().get("photos", []):
+                if self._seen(account, "pexels_p", p["id"]):
+                    continue
+                url = p["src"].get("portrait") or p["src"].get("large2x") or p["src"]["original"]
+                path = self._download(url, ".jpg")
+                self._mark(account, "pexels_p", p["id"])
+                return str(self._fit_image(path))
+        return None
+
     # ---- Pixabay ------------------------------------------------------
     def _from_pixabay(self, queries, account) -> Optional[Dict]:
         src_tag = "pixabay"
@@ -144,6 +198,23 @@ class BackgroundProvider:
                 self._mark(account, "pixabay_p", h["id"])
                 log.info("background: pixabay photo #%s (%s)", h["id"], q)
                 return {"type": "image", "path": str(self._fit_image(path)), "source": src_tag}
+        return None
+
+    def _fetch_pixabay_image(self, queries, account) -> Optional[str]:
+        """Fetch a single Pixabay image for slideshow mode."""
+        if not self.pixabay_key:
+            return None
+        q = random.choice(queries)
+        r = requests.get("https://pixabay.com/api/", timeout=30,
+                         params={"key": self.pixabay_key, "q": q, "image_type": "photo",
+                                 "orientation": "vertical", "per_page": 20})
+        if r.ok:
+            for h in r.json().get("hits", []):
+                if self._seen(account, "pixabay_p", h["id"]):
+                    continue
+                path = self._download(h["largeImageURL"], ".jpg")
+                self._mark(account, "pixabay_p", h["id"])
+                return str(self._fit_image(path))
         return None
 
     # ---- helpers ------------------------------------------------------
