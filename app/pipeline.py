@@ -48,7 +48,8 @@ class Pipeline:
                      hashtags_override: str | None = None,
                      duration: Optional[int] = None,
                      text_color: Optional[str] = None,
-                     tts_speed: Optional[float] = None) -> Dict:
+                     tts_speed: Optional[float] = None,
+                     use_slideshow: bool = False) -> Dict:
         rng = random.Random(seed)
         level_spec = self.cfg.levels.get(level)
         if not level_spec:
@@ -71,7 +72,7 @@ class Pipeline:
         duration = float(min(max(timing["total"], target * 0.8), target * 1.2))
 
         # 4) background
-        background = self.bg.get(queries, account=(account or {}).get("id", "default"))
+        background = self.bg.get(queries, account=(account or {}).get("id", "default"), use_slideshow=use_slideshow)
 
         # 5) build output job folder
         meta = build_metadata(script, account,
@@ -133,7 +134,8 @@ class Pipeline:
                        hashtags_override: str | None = None,
                        duration: Optional[int] = None,
                        text_color: Optional[str] = None,
-                       tts_speed: Optional[float] = None):
+                       tts_speed: Optional[float] = None,
+                       use_slideshow: bool = False):
         results = []
         for i in range(count):
             lvl = level or (account or {}).get("level") or random.choice(list(self.cfg.levels))
@@ -150,6 +152,7 @@ class Pipeline:
                     duration=duration,
                     text_color=text_color,
                     tts_speed=tts_speed,
+                    use_slideshow=use_slideshow,
                 ))
             except Exception as e:
                 log.error("video %d/%d failed: %s", i + 1, count, e)

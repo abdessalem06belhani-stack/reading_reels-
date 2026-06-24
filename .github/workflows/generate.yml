@@ -77,6 +77,11 @@ on:
         required: false
         default: ''
         type: string
+      use_slideshow:
+        description: 'Use slideshow mode: multiple images changing every ~5 seconds instead of single video'
+        required: false
+        default: false
+        type: boolean
 
       # ===== AUDIO & NARRATION =====
       enable_narration:
@@ -178,6 +183,7 @@ jobs:
           GH_TEXT_SCROLL_SPEED: ${{ inputs.text_scroll_speed }}
           GH_BACKGROUND_SOURCE: ${{ inputs.background_source }}
           GH_MOOD_OVERRIDE: ${{ inputs.mood_override }}
+          GH_USE_SLIDESHOW: ${{ inputs.use_slideshow }}
           GH_ENABLE_NARRATION: ${{ inputs.enable_narration }}
           GH_TTS_SPEED: ${{ inputs.tts_speed }}
           GH_BACKGROUND_MUSIC: ${{ inputs.background_music }}
@@ -220,6 +226,11 @@ jobs:
             # Disable narration if specified
             if [ "${{ inputs.enable_narration }}" = "false" ]; then
               ARGS="$ARGS --no-audio"
+            fi
+            
+            # Enable slideshow if specified
+            if [ "${{ inputs.use_slideshow }}" = "true" ]; then
+              ARGS="$ARGS --slideshow"
             fi
             
             python -m app.main $ARGS

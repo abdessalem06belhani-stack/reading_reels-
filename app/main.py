@@ -61,6 +61,7 @@ def cmd_one(cfg, args):
         duration=args.duration,
         text_color=args.text_color,
         tts_speed=args.tts_speed,
+        use_slideshow=args.slideshow,
     )
     keys = ("video", "job_dir", "duration", "script_source")
     out = {k: res[k] for k in keys}
@@ -78,7 +79,8 @@ def cmd_batch(cfg, args):
                               hashtags_override=args.hashtags,
                               duration=args.duration,
                               text_color=args.text_color,
-                              tts_speed=args.tts_speed)
+                              tts_speed=args.tts_speed,
+                              use_slideshow=args.slideshow)
     print(f"\nGenerated {len(res)} videos:")
     for r in res:
         print(" -", r["video"], ("[uploaded]" if r.get("upload", {}).get("status") == "submitted" else ""))
@@ -102,6 +104,7 @@ def cmd_accounts(cfg, args):
             duration=args.duration,
             text_color=args.text_color,
             tts_speed=args.tts_speed,
+            use_slideshow=args.slideshow,
         )
     print(f"\nGenerated {len(total)} videos across {len(cfg.accounts.get('accounts', []))} accounts.")
 
@@ -149,6 +152,7 @@ def build_parser():
     o.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
     o.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
     o.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
+    o.add_argument("--slideshow", action="store_true", help="use multiple images instead of single video")
     o.set_defaults(fn=cmd_one)
 
     b = sub.add_parser("batch", help="generate N videos")
@@ -163,6 +167,7 @@ def build_parser():
     b.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
     b.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
     b.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
+    b.add_argument("--slideshow", action="store_true", help="use multiple images instead of single video")
     b.set_defaults(fn=cmd_batch)
 
     a = sub.add_parser("accounts", help="generate per account from accounts.yaml")
@@ -176,6 +181,7 @@ def build_parser():
     a.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
     a.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
     a.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
+    a.add_argument("--slideshow", action="store_true", help="use multiple images instead of single video")
     a.set_defaults(fn=cmd_accounts)
 
     u = sub.add_parser("upload", help="upload an existing video to TikTok")
