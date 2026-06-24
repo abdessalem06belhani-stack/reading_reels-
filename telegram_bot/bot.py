@@ -5,7 +5,7 @@ Interactive video customization + generation + delivery.
 Start:  python -m telegram_bot.bot
 """
 from __future__ import annotations
-import os, asyncio, logging, threading, tempfile
+import os, asyncio, logging, threading, tempfile, time
 from collections import defaultdict
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,6 +13,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from telegram.request import HTTPXRequest
 
 logger = logging.getLogger(__name__)
+import telegram
 
 from app.config_loader import load_config
 from app.pipeline import Pipeline
@@ -350,12 +351,31 @@ def main():
     app.add_error_handler(error_handler)
 
     print("Bot is running... Press Ctrl+C to stop.")
-    app.run_polling(
-        drop_pending_updates=True,
-        allowed_updates=Update.ALL_TYPES,
-        poll_interval=2.0,       # slightly slower to reduce conflict window
-        timeout=30,
-    )
+
+    # Run polling inside a loop so Conflict errors (another
+    # getUpdates client still running) don't crash the process.
+    # Retry with a short backoff so the new container can win
+    # the getUpdates race during redeploys (common on Railway).
+    while True:
+        try:
+            app.run_polling(
+                drop_pending_updates=True,
+                allowed_updates=Update.ALL_TYPES,
+                poll_interval=2.0,       # slightly slower to reduce conflict window
+                timeout=30,
+            )
+            break
+        except telegram.error.Conflict:
+            logger.warning("Conflict detected: another getUpdates client is running — retrying in 5s.")
+            time.sleep(5)
+            continue
+        except KeyboardInterrupt:
+            logger.info("Shutdown requested by user.")
+            break
+        except Exception as e:
+            logger.error("Unhandled exception in polling loop: %s", e, exc_info=e)
+            time.sleep(5)
+            continue
 
 
 if __name__ == "__main__":
