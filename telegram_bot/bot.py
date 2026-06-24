@@ -270,7 +270,7 @@ async def run_generation(callback_query, chat_id):
             results.append(r)
             vid_path = r["video"]
             meta = r.get("meta", {})
-            caption = meta.get("caption", "")[:1000]
+            caption = str(meta.get("caption", ""))[:1000]
             with open(vid_path, "rb") as f:
                 await callback_query.message.reply_video(
                     video=f, caption=f"{'🔊' if voice else '🔇'} مستوى {level} | {meta.get('title', '')}\n\n{caption}",
