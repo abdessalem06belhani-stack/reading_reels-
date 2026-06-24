@@ -351,31 +351,49 @@ def main():
     app.add_error_handler(error_handler)
 
     print("Bot is running... Press Ctrl+C to stop.")
+    # If a webhook URL is provided (e.g. via Railway env), prefer webhooks
+    # to avoid getUpdates races. Otherwise fall back to resilient polling.
+    webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
+    port = int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", 8443)))
 
-    # Run polling inside a loop so Conflict errors (another
-    # getUpdates client still running) don't crash the process.
-    # Retry with a short backoff so the new container can win
-    # the getUpdates race during redeploys (common on Railway).
-    while True:
+    if webhook_url:
+        url_path = os.getenv("TELEGRAM_WEBHOOK_PATH", "/")
         try:
-            app.run_polling(
+            app.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                url_path=url_path,
+                webhook_url=webhook_url,
                 drop_pending_updates=True,
-                allowed_updates=Update.ALL_TYPES,
-                poll_interval=2.0,       # slightly slower to reduce conflict window
-                timeout=30,
             )
-            break
-        except telegram.error.Conflict:
-            logger.warning("Conflict detected: another getUpdates client is running — retrying in 5s.")
-            time.sleep(5)
-            continue
-        except KeyboardInterrupt:
-            logger.info("Shutdown requested by user.")
-            break
         except Exception as e:
-            logger.error("Unhandled exception in polling loop: %s", e, exc_info=e)
-            time.sleep(5)
-            continue
+            logger.error("Webhook mode failed: %s", e, exc_info=e)
+            raise
+    else:
+        # Run polling inside a loop so Conflict errors (another
+        # getUpdates client still running) don't crash the process.
+        # Retry with a short backoff so the new container can win
+        # the getUpdates race during redeploys (common on Railway).
+        while True:
+            try:
+                app.run_polling(
+                    drop_pending_updates=True,
+                    allowed_updates=Update.ALL_TYPES,
+                    poll_interval=2.0,       # slightly slower to reduce conflict window
+                    timeout=30,
+                )
+                break
+            except telegram.error.Conflict:
+                logger.warning("Conflict detected: another getUpdates client is running — retrying in 5s.")
+                time.sleep(5)
+                continue
+            except KeyboardInterrupt:
+                logger.info("Shutdown requested by user.")
+                break
+            except Exception as e:
+                logger.error("Unhandled exception in polling loop: %s", e, exc_info=e)
+                time.sleep(5)
+                continue
 
 
 if __name__ == "__main__":
