@@ -231,31 +231,11 @@ class Renderer:
         args = [*inputs, *extra,
                 "-filter_complex", filter_complex,
                 "-map", "[outv]", "-map", alabel,
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(self.crf),
+                "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
                 "-pix_fmt", self.pix_fmt, "-r", str(fps),
-                "-threads", "1",
-                "-max_muxing_queue_size", "1024",
                 "-c:a", "aac", "-b:a", "192k",
                 "-t", str(duration), "-movflags", "+faststart",
                 str(out_mp4)]
         ensure_dir(out_mp4.parent)
-        try:
-            run_ffmpeg(args, desc=f"render {out_mp4.name}")
-        except RuntimeError:
-            log.warning("main render failed → retrying with format=yuv420p on bg")
-            bg_f_yuv = bg_f.replace("format=rgba", "format=yuv420p")
-            vf_yuv = [bg_f_yuv] + vfilters[1:]
-            fc_yuv = ";".join(vf_yuv + afilters)
-            args_yuv = [
-                *inputs, *extra,
-                "-filter_complex", fc_yuv,
-                "-map", "[outv]", "-map", alabel,
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(self.crf),
-                "-pix_fmt", self.pix_fmt, "-r", str(fps),
-                "-threads", "1",
-                "-max_muxing_queue_size", "1024",
-                "-c:a", "aac", "-b:a", "192k",
-                "-t", str(duration), "-movflags", "+faststart",
-                str(out_mp4)]
-            run_ffmpeg(args_yuv, desc=f"render {out_mp4.name} (fallback)")
+        run_ffmpeg(args, desc=f"render {out_mp4.name}")
         return out_mp4

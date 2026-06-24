@@ -4,9 +4,6 @@ imageio-ffmpeg>=0.5.1     # ships a static ffmpeg binary, no system install need
 Pillow>=10.0.0            # text strip + gradient rendering
 numpy>=1.24.0             # gradient/noise math
 requests>=2.31.0          # NVIDIA NIM + Pexels/Pixabay HTTP calls
-charset-normalizer>=2.0.0 # dependency safety for requests/urllib3
-chardet>=5.2.0             # dependency safety for requests
-
 PyYAML>=6.0               # config files
 python-dotenv>=1.0.0      # load .env
 
