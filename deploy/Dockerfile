@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run the Telegram bot (interactive, polling mode)
-CMD ["python", "-m", "app.main", "bot"]
+CMD ["python", "-m", "telegram_bot.bot"]

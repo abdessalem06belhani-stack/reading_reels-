@@ -5,20 +5,17 @@ Interactive video customization + generation + delivery.
 Start:  python -m telegram_bot.bot
 """
 from __future__ import annotations
-import os, asyncio, threading, tempfile
-import telegram
+import os, asyncio, logging, threading, tempfile
 from collections import defaultdict
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.request import HTTPXRequest
 
-from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
 from app.config_loader import load_config
 from app.pipeline import Pipeline
-
-# Load .env BEFORE reading env vars (supports both local .env and Railway OS env)
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
@@ -249,10 +246,7 @@ async def status_cmd(update: Update, ctx, edit=False):
         f"الموضوع: {'عشوائي' if not topic else topic}\n"
     )
     if edit:
-        try:
-            await update.callback_query.edit_message_text(text, reply_markup=main_menu(), parse_mode="Markdown")
-        except Exception:
-            pass
+        await update.callback_query.edit_message_text(text, reply_markup=main_menu(), parse_mode="Markdown")
     else:
         await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -290,58 +284,10 @@ async def run_generation(callback_query, chat_id):
     )
 
 
-# ── health server (Railway port detection) ────────────────────
-def _health_server(port: int):
-    """Minimal HTTP server so Railway detects this as a web service."""
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    class H(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"ok")
-        def log_message(self, *a): pass
-    try:
-        HTTPServer(("0.0.0.0", port), H).serve_forever()
-    except Exception as e:
-        print(f"health server: {e}")
-
-
-# ── polling with conflict retry ───────────────────────────────
-async def _poll_forever(app: Application):
-    """Run polling forever, retrying automatically on any error with backoff."""
-    await app.initialize()
-    await app.bot.delete_webhook(drop_pending_updates=True)
-    await app.start()
-    retry_delay = 1
-    max_delay = 60
-    while True:
-        try:
-            await app.updater.start_polling(
-                drop_pending_updates=True,
-                allowed_updates=["message", "callback_query"],
-            )
-            retry_delay = 1
-            while True:
-                await asyncio.sleep(3600)
-        except telegram.error.Conflict:
-            print("⚠️ Conflict — retrying in 30s")
-            await asyncio.sleep(30)
-            retry_delay = 1
-            try:
-                await app.updater.stop()
-            except Exception:
-                pass
-        except Exception as e:
-            import traceback
-            print(f"⚠️ Polling error: {e}")
-            traceback.print_exc()
-            print(f"⏳ Retrying in {retry_delay}s...")
-            await asyncio.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, max_delay)
-            try:
-                await app.updater.stop()
-            except Exception:
-                pass
+# ── error callback for polling resilience ─────────────────────
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log errors caused by updates and continue running."""
+    logger.error("Exception while handling an update: %s", context.error, exc_info=context.error)
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -354,46 +300,48 @@ def main():
         print("ERROR: TELEGRAM_BOT_TOKEN not set in environment.")
         return
 
-    app = Application.builder().token(token).build()
+    # Custom request with generous timeouts and connection pool to
+    # prevent httpcore.ReadError on long-polling connections.
+    request = HTTPXRequest(
+        connection_pool_size=8,
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=15,
+        pool_timeout=10,
+    )
+
+    app = (
+        Application.builder()
+        .token(token)
+        .request(request)
+        .get_updates_request(
+            HTTPXRequest(
+                connection_pool_size=8,
+                read_timeout=60,       # long-polling reads can take a while
+                write_timeout=30,
+                connect_timeout=15,
+                pool_timeout=10,
+            )
+        )
+        .build()
+    )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_error_handler(error_handler)
 
-    railway_port = os.getenv("PORT")
-    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL")
-
-    # ── On Railway with public domain → webhook (best, no conflicts) ──
-    if railway_port and railway_domain:
-        port = int(railway_port)
-        url_path = f"/webhook/{token}"
-        webhook_url = f"https://{railway_domain}{url_path}"
-        print(f"🌐 webhook 0.0.0.0:{port} → {webhook_url}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=url_path,
-            webhook_url=webhook_url,
-            secret_token=token,
-            drop_pending_updates=True,
-        )
-        return
-
-    # ── Railway without public domain → health server (main) + polling (bg thread) ──
-    if railway_port:
-        t = threading.Thread(target=lambda: asyncio.run(_poll_forever(app)), daemon=True)
-        t.start()
-        print(f"🏥 health → 0.0.0.0:{railway_port}  |  polling in background thread")
-        _health_server(int(railway_port))
-        return
-
-    # ── Local polling ──
-    try:
-        asyncio.run(_poll_forever(app))
-    except Exception as e:
-        import traceback
-        print(f"Fatal error, exiting: {e}")
-        traceback.print_exc()
+    print("Bot is running... Press Ctrl+C to stop.")
+    # drop_pending_updates=True  → clears stale getUpdates offset,
+    #   prevents "Conflict: terminated by other getUpdates request".
+    # allowed_updates=Update.ALL_TYPES → explicit update scope.
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES,
+        poll_interval=1.0,
+        timeout=30,
+    )
 
 
 if __name__ == "__main__":
     main()
+
