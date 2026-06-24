@@ -49,8 +49,19 @@ def cmd_doctor(cfg, args):
 
 def cmd_one(cfg, args):
     pipe = Pipeline(cfg)
-    res = pipe.generate_one(args.level, topic=args.topic, seed=args.seed,
-                            with_audio=not args.no_audio, auto_upload=args.auto_upload)
+    res = pipe.generate_one(
+        args.level,
+        topic=args.topic,
+        seed=args.seed,
+        with_audio=not args.no_audio,
+        auto_upload=args.auto_upload,
+        title_override=args.title,
+        caption_override=args.caption,
+        hashtags_override=args.hashtags,
+        duration=args.duration,
+        text_color=args.text_color,
+        tts_speed=args.tts_speed,
+    )
     keys = ("video", "job_dir", "duration", "script_source")
     out = {k: res[k] for k in keys}
     if "upload" in res:
@@ -61,7 +72,13 @@ def cmd_one(cfg, args):
 def cmd_batch(cfg, args):
     pipe = Pipeline(cfg)
     res = pipe.generate_batch(args.count, level=args.level, with_audio=not args.no_audio,
-                              auto_upload=args.auto_upload)
+                              auto_upload=args.auto_upload,
+                              title_override=args.title,
+                              caption_override=args.caption,
+                              hashtags_override=args.hashtags,
+                              duration=args.duration,
+                              text_color=args.text_color,
+                              tts_speed=args.tts_speed)
     print(f"\nGenerated {len(res)} videos:")
     for r in res:
         print(" -", r["video"], ("[uploaded]" if r.get("upload", {}).get("status") == "submitted" else ""))
@@ -73,8 +90,19 @@ def cmd_accounts(cfg, args):
     for acc in cfg.accounts.get("accounts", []):
         n = args.per_account or acc.get("posting", {}).get("per_day", 1)
         log.info("account %s -> %d videos", acc["id"], n)
-        total += pipe.generate_batch(n, level=acc.get("level"), account=acc,
-                                     with_audio=not args.no_audio, auto_upload=args.auto_upload)
+        total += pipe.generate_batch(
+            n,
+            level=acc.get("level"),
+            account=acc,
+            with_audio=not args.no_audio,
+            auto_upload=args.auto_upload,
+            title_override=args.title,
+            caption_override=args.caption,
+            hashtags_override=args.hashtags,
+            duration=args.duration,
+            text_color=args.text_color,
+            tts_speed=args.tts_speed,
+        )
     print(f"\nGenerated {len(total)} videos across {len(cfg.accounts.get('accounts', []))} accounts.")
 
 
@@ -86,7 +114,17 @@ def cmd_upload(cfg, args):
         caption = Path(args.caption_file).read_text()
     elif args.caption:
         caption = args.caption
-    res = TikTokUploader(cfg).upload(args.video, caption, job_dir=str(Path(args.video).parent))
+    res = TikTokUploader(cfg).upload(
+        args.video,
+        caption,
+        job_dir=str(Path(args.video).parent),
+        title_override=args.title,
+        hashtags_override=args.hashtags,
+        privacy=args.privacy,
+        disable_comment=args.disable_comment,
+        disable_duet=args.disable_duet,
+        disable_stitch=args.disable_stitch,
+    )
     print(json.dumps(res, indent=2))
 
 
@@ -104,6 +142,13 @@ def build_parser():
     o.add_argument("--seed", type=int, default=None)
     o.add_argument("--no-audio", action="store_true")
     o.add_argument("--auto-upload", action="store_true", help="post to TikTok after rendering")
+    o.add_argument("--title", default=None, help="override the video title")
+    o.add_argument("--caption", default=None, help="override the TikTok caption")
+    o.add_argument("--hashtags", default=None, help="comma-separated hashtags")
+    # Customization flags
+    o.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
+    o.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
+    o.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
     o.set_defaults(fn=cmd_one)
 
     b = sub.add_parser("batch", help="generate N videos")
@@ -111,18 +156,38 @@ def build_parser():
     b.add_argument("--level", default=None)
     b.add_argument("--no-audio", action="store_true")
     b.add_argument("--auto-upload", action="store_true")
+    b.add_argument("--title", default=None, help="override the video title")
+    b.add_argument("--caption", default=None, help="override the TikTok caption")
+    b.add_argument("--hashtags", default=None, help="comma-separated hashtags")
+    # Customization flags
+    b.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
+    b.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
+    b.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
     b.set_defaults(fn=cmd_batch)
 
     a = sub.add_parser("accounts", help="generate per account from accounts.yaml")
     a.add_argument("--per-account", type=int, default=None)
     a.add_argument("--no-audio", action="store_true")
     a.add_argument("--auto-upload", action="store_true")
+    a.add_argument("--title", default=None, help="override the video title")
+    a.add_argument("--caption", default=None, help="override the TikTok caption")
+    a.add_argument("--hashtags", default=None, help="comma-separated hashtags")
+    # Customization flags
+    a.add_argument("--duration", type=int, default=None, help="target video duration in seconds (60-180)")
+    a.add_argument("--text-color", default=None, help="text color in hex (#RRGGBB)")
+    a.add_argument("--tts-speed", type=float, default=None, help="TTS speed multiplier (0.8-1.5)")
     a.set_defaults(fn=cmd_accounts)
 
     u = sub.add_parser("upload", help="upload an existing video to TikTok")
     u.add_argument("--video", required=True)
     u.add_argument("--caption-file", default=None)
     u.add_argument("--caption", default=None)
+    u.add_argument("--title", default=None, help="override TikTok video title for API upload")
+    u.add_argument("--hashtags", default=None, help="comma-separated hashtags for API upload")
+    u.add_argument("--privacy", default=None, help="privacy level for TikTok API upload")
+    u.add_argument("--disable-comment", action="store_true")
+    u.add_argument("--disable-duet", action="store_true")
+    u.add_argument("--disable-stitch", action="store_true")
     u.set_defaults(fn=cmd_upload)
     return p
 

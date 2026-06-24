@@ -3,28 +3,135 @@ name: generate-reading-videos
 on:
   workflow_dispatch:
     inputs:
+      # ===== VIDEO CONTENT =====
       level:
-        description: 'CEFR Level'
+        description: 'CEFR Level (A1 = Beginner, C1 = Advanced)'
         required: true
         default: 'B1'
         type: choice
         options: [A1, A2, B1, B2, C1]
       topic:
-        description: 'Topic (leave blank for random)'
+        description: 'Topic override (leave blank for random)'
         required: false
         default: ''
         type: string
       count:
-        description: 'Number of videos'
+        description: 'Number of videos to generate'
         required: true
         default: '1'
         type: choice
         options: ['1', '2', '3', '5', '10']
+      duration:
+        description: 'Target video duration in seconds (60-180)'
+        required: false
+        default: '120'
+        type: string
+      seed:
+        description: 'Random seed for reproducibility (leave blank for random)'
+        required: false
+        default: ''
+        type: string
+
+      # ===== TEXT STYLING =====
+      text_font:
+        description: 'Text font family'
+        required: false
+        default: 'DejaVuSans'
+        type: choice
+        options: ['DejaVuSans', 'DejaVuSans-Bold', 'Courier', 'Arial']
+      text_size_intro:
+        description: 'Intro text size (pixels, 60-120)'
+        required: false
+        default: '86'
+        type: string
+      text_size_body:
+        description: 'Body text size (pixels, 40-90)'
+        required: false
+        default: '60'
+        type: string
+      text_color:
+        description: 'Text color (hex: #RRGGBB, default white)'
+        required: false
+        default: '#FFFFFF'
+        type: string
+      text_stroke_width:
+        description: 'Text stroke/outline width (pixels, 1-5)'
+        required: false
+        default: '2'
+        type: string
+      text_scroll_speed:
+        description: 'Text scroll animation speed (0.5-3x, default 1.0)'
+        required: false
+        default: '1.0'
+        type: string
+
+      # ===== BACKGROUND =====
+      background_source:
+        description: 'Background media source'
+        required: false
+        default: 'auto'
+        type: choice
+        options: ['auto', 'pexels', 'pixabay']
+      mood_override:
+        description: 'Override background mood query (e.g., "cozy morning")'
+        required: false
+        default: ''
+        type: string
+
+      # ===== AUDIO & NARRATION =====
+      enable_narration:
+        description: 'Enable full-text narration'
+        required: false
+        default: true
+        type: boolean
+      tts_speed:
+        description: 'TTS speed multiplier (0.8-1.5)'
+        required: false
+        default: '1.0'
+        type: string
+      background_music:
+        description: 'Include background music'
+        required: false
+        default: true
+        type: boolean
+      music_gain:
+        description: 'Background music volume in dB (-30 to -10, default -22)'
+        required: false
+        default: '-22'
+        type: string
+
+      # ===== METADATA & PUBLISHING =====
+      title_override:
+        description: 'Override video title'
+        required: false
+        default: ''
+        type: string
+      caption_override:
+        description: 'Override TikTok caption'
+        required: false
+        default: ''
+        type: string
+      hashtags_override:
+        description: 'Override hashtags (comma-separated)'
+        required: false
+        default: ''
+        type: string
+      auto_upload_tiktok:
+        description: 'Auto-upload to TikTok (requires account setup)'
+        required: false
+        default: false
+        type: boolean
       send_telegram:
         description: 'Send result to Telegram'
         required: true
         default: true
         type: boolean
+      telegram_chat_override:
+        description: 'Telegram chat ID override (leave blank to use secret)'
+        required: false
+        default: ''
+        type: string
+
   schedule:
     - cron: "0 7 * * *"
 
@@ -60,14 +167,64 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          # Video generation parameters
+          GH_DURATION: ${{ inputs.duration }}
+          GH_SEED: ${{ inputs.seed }}
+          GH_TEXT_FONT: ${{ inputs.text_font }}
+          GH_TEXT_SIZE_INTRO: ${{ inputs.text_size_intro }}
+          GH_TEXT_SIZE_BODY: ${{ inputs.text_size_body }}
+          GH_TEXT_COLOR: ${{ inputs.text_color }}
+          GH_TEXT_STROKE_WIDTH: ${{ inputs.text_stroke_width }}
+          GH_TEXT_SCROLL_SPEED: ${{ inputs.text_scroll_speed }}
+          GH_BACKGROUND_SOURCE: ${{ inputs.background_source }}
+          GH_MOOD_OVERRIDE: ${{ inputs.mood_override }}
+          GH_ENABLE_NARRATION: ${{ inputs.enable_narration }}
+          GH_TTS_SPEED: ${{ inputs.tts_speed }}
+          GH_BACKGROUND_MUSIC: ${{ inputs.background_music }}
+          GH_MUSIC_GAIN: ${{ inputs.music_gain }}
+          GH_TITLE_OVERRIDE: ${{ inputs.title_override }}
+          GH_CAPTION_OVERRIDE: ${{ inputs.caption_override }}
+          GH_HASHTAGS_OVERRIDE: ${{ inputs.hashtags_override }}
+          GH_AUTO_UPLOAD: ${{ inputs.auto_upload_tiktok }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TOPIC_ARG=""
+            # Build CLI arguments from inputs
+            ARGS="batch --count ${{ inputs.count }} --level ${{ inputs.level }}"
+            
+            # Optional topic
             if [ -n "${{ inputs.topic }}" ]; then
-              TOPIC_ARG="--topic \"${{ inputs.topic }}\""
+              ARGS="$ARGS --topic \"${{ inputs.topic }}\""
             fi
-            python -m app.main batch --count ${{ inputs.count }} --level ${{ inputs.level }} $TOPIC_ARG
+            
+            # Optional seed
+            if [ -n "${{ inputs.seed }}" ]; then
+              ARGS="$ARGS --seed ${{ inputs.seed }}"
+            fi
+            
+            # Optional title, caption, hashtags
+            if [ -n "${{ inputs.title_override }}" ]; then
+              ARGS="$ARGS --title \"${{ inputs.title_override }}\""
+            fi
+            if [ -n "${{ inputs.caption_override }}" ]; then
+              ARGS="$ARGS --caption \"${{ inputs.caption_override }}\""
+            fi
+            if [ -n "${{ inputs.hashtags_override }}" ]; then
+              ARGS="$ARGS --hashtags \"${{ inputs.hashtags_override }}\""
+            fi
+            
+            # Optional auto-upload
+            if [ "${{ inputs.auto_upload_tiktok }}" = "true" ]; then
+              ARGS="$ARGS --auto-upload"
+            fi
+            
+            # Disable narration if specified
+            if [ "${{ inputs.enable_narration }}" = "false" ]; then
+              ARGS="$ARGS --no-audio"
+            fi
+            
+            python -m app.main $ARGS
           else
+            # Scheduled run: use default settings
             python -m app.main accounts
           fi
 
@@ -75,10 +232,14 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && fromJSON(inputs.send_telegram)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ inputs.telegram_chat_override || secrets.TELEGRAM_CHAT_ID }}
         run: |
           for dir in outputs/jobs/*/; do
-            python telegram_sender.py --dir "$dir"
+            if [ -d "$dir" ]; then
+              python telegram_sender.py --dir "$dir" \
+                --chat-id "$TELEGRAM_CHAT_ID" \
+                --bot-token "$TELEGRAM_BOT_TOKEN"
+            fi
           done
 
       - name: Upload artifacts

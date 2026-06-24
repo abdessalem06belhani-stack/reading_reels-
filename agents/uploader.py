@@ -34,11 +34,23 @@ class TikTokUploader:
         self.u = cfg.get("upload", default={}) or {}
 
     # ------------------------------------------------------------------
-    def upload(self, video_path: str, caption: str, job_dir: Optional[str] = None) -> Dict:
+    def upload(self, video_path: str, caption: str, job_dir: Optional[str] = None,
+               title_override: str | None = None,
+               hashtags_override: str | None = None,
+               privacy: str | None = None,
+               disable_comment: bool = False,
+               disable_duet: bool = False,
+               disable_stitch: bool = False) -> Dict:
         method = (self.u.get("method") or "web").lower()
         log.info("uploading to TikTok via '%s' method ...", method)
         if method == "api":
-            return self.upload_api(video_path, caption)
+            return self.upload_api(video_path, caption,
+                                   title_override=title_override,
+                                   hashtags_override=hashtags_override,
+                                   privacy=privacy,
+                                   disable_comment=disable_comment,
+                                   disable_duet=disable_duet,
+                                   disable_stitch=disable_stitch)
         return self.upload_web(video_path, caption, job_dir=job_dir)
 
     # ============================ WEB =================================
@@ -157,7 +169,13 @@ class TikTokUploader:
             driver.switch_to.default_content()
 
     # ============================ API =================================
-    def upload_api(self, video_path: str, caption: str) -> Dict:
+    def upload_api(self, video_path: str, caption: str,
+                   title_override: str | None = None,
+                   hashtags_override: str | None = None,
+                   privacy: str | None = None,
+                   disable_comment: bool = False,
+                   disable_duet: bool = False,
+                   disable_stitch: bool = False) -> Dict:
         import requests
         api = self.u.get("api", {}) or {}
         token = os.getenv(api.get("access_token_env", "TIKTOK_ACCESS_TOKEN"), "").strip()
@@ -166,15 +184,21 @@ class TikTokUploader:
                 "No TikTok access token. Set the env var named in "
                 "config.upload.api.access_token_env (default TIKTOK_ACCESS_TOKEN). "
                 "Requires an approved developer app with scope video.publish.")
-        privacy = api.get("privacy_level", "SELF_ONLY")
+        privacy = privacy or api.get("privacy_level", "SELF_ONLY")
+        title = title_override or caption[:2200]
+        if hashtags_override:
+            tags = [t.strip() for t in hashtags_override.split(",") if t.strip()]
+            if tags:
+                caption = caption.strip() + "\n\n" + " ".join(tags)
         size = os.path.getsize(video_path)
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         init = requests.post(
             "https://open.tiktokapis.com/v2/post/publish/video/init/",
             headers=headers,
-            json={"post_info": {"title": caption[:2200], "privacy_level": privacy,
-                                "disable_comment": False, "disable_duet": False,
-                                "disable_stitch": False},
+            json={"post_info": {"title": title[:2200], "privacy_level": privacy,
+                                "disable_comment": disable_comment,
+                                "disable_duet": disable_duet,
+                                "disable_stitch": disable_stitch},
                   "source_info": {"source": "FILE_UPLOAD", "video_size": size,
                                   "chunk_size": size, "total_chunk_count": 1}},
             timeout=60)

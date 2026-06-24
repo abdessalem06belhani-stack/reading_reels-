@@ -73,7 +73,7 @@ class Renderer:
         self.t = cfg.get("text", default={})
 
     # ------------------------------------------------------------------
-    def build_text_strip(self, intro: List[str], lines: List[str], out_png: Path):
+    def build_text_strip(self, intro: List[str], lines: List[str], out_png: Path, text_color: Optional[str] = None):
         W = self.W
         margin = self.t.get("side_margin", 96)
         max_w = W - 2 * margin
@@ -99,7 +99,7 @@ class Renderer:
 
         img = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        fill = _hex(self.t.get("text_color", "#FFFFFF"))
+        fill = _hex(text_color or self.t.get("text_color", "#FFFFFF"))
         stroke = _hex(self.t.get("stroke_color", "#000000"))
         sw = self.t.get("stroke_width", 6)
         shadow = self.t.get("shadow", True)

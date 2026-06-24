@@ -39,7 +39,7 @@ def send_video(file_path: str, caption: str = "",
     return False
 
 
-def send_job_dir(job_dir: str):
+def send_job_dir(job_dir: str, bot_token: Optional[str] = None, chat_id: Optional[str] = None):
     p = Path(job_dir)
     mp4s = list(p.glob("*.mp4"))
     caption_txt = p / "caption.txt"
@@ -50,14 +50,14 @@ def send_job_dir(job_dir: str):
     level = meta.get("level", "B1")
     cap = f"{title} | Level: {level}\n\n{caption}"
     for mp4 in mp4s:
-        send_video(str(mp4), caption=cap)
+        send_video(str(mp4), caption=cap, bot_token=bot_token, chat_id=chat_id)
 
 
 def cmd_send(args):
     if args.dir:
-        send_job_dir(args.dir)
+        send_job_dir(args.dir, bot_token=args.bot_token, chat_id=args.chat_id)
     elif args.file:
-        send_video(args.file, args.caption or "")
+        send_video(args.file, caption=args.caption or "", bot_token=args.bot_token, chat_id=args.chat_id)
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(prog="telegram_sender")
