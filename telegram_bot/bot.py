@@ -286,8 +286,26 @@ async def run_generation(callback_query, chat_id):
 
 # ── error callback for polling resilience ─────────────────────
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log errors caused by updates and continue running."""
+    """Log errors caused by updates and continue running.
+    Conflict errors are expected during Railway redeployments when the old
+    container hasn't fully stopped yet — we log them at WARNING level and
+    carry on instead of crashing."""
+    import telegram.error
+    if isinstance(context.error, telegram.error.Conflict):
+        logger.warning("Conflict error (another instance may still be shutting down) — retrying automatically.")
+        return
     logger.error("Exception while handling an update: %s", context.error, exc_info=context.error)
+
+
+async def post_init(application) -> None:
+    """Called after Application.initialize().
+    Force-clears any existing polling session so the NEW container wins
+    the getUpdates race during Railway redeployments."""
+    logger.info("Clearing previous polling session (deleteWebhook + drop_pending_updates)...")
+    await application.bot.delete_webhook(drop_pending_updates=True)
+    # Give the old container a few seconds to realise it lost the race and exit.
+    await asyncio.sleep(5)
+    logger.info("Ready to start polling.")
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -323,6 +341,7 @@ def main():
                 pool_timeout=10,
             )
         )
+        .post_init(post_init)
         .build()
     )
     app.add_handler(CommandHandler("start", start))
@@ -331,13 +350,10 @@ def main():
     app.add_error_handler(error_handler)
 
     print("Bot is running... Press Ctrl+C to stop.")
-    # drop_pending_updates=True  → clears stale getUpdates offset,
-    #   prevents "Conflict: terminated by other getUpdates request".
-    # allowed_updates=Update.ALL_TYPES → explicit update scope.
     app.run_polling(
         drop_pending_updates=True,
         allowed_updates=Update.ALL_TYPES,
-        poll_interval=1.0,
+        poll_interval=2.0,       # slightly slower to reduce conflict window
         timeout=30,
     )
 
