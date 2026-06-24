@@ -228,14 +228,16 @@ class Renderer:
             a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration)
 
         filter_complex = ";".join(vfilters + afilters)
+        if alabel is None:
+            raise RuntimeError("render failed: no audio track could be constructed")
         args = [*inputs, *extra,
-                "-filter_complex", filter_complex,
-                "-map", "[outv]", "-map", alabel,
-                "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
-                "-pix_fmt", self.pix_fmt, "-r", str(fps),
-                "-c:a", "aac", "-b:a", "192k",
-                "-t", str(duration), "-movflags", "+faststart",
-                str(out_mp4)]
+            "-filter_complex", filter_complex,
+            "-map", "[outv]", "-map", alabel,
+            "-c:v", "libx264", "-preset", self.preset, "-crf", str(self.crf),
+            "-pix_fmt", self.pix_fmt, "-r", str(fps),
+            "-c:a", "aac", "-b:a", "192k",
+            "-t", str(duration), "-movflags", "+faststart",
+            str(out_mp4)]
         ensure_dir(out_mp4.parent)
         run_ffmpeg(args, desc=f"render {out_mp4.name}")
         return out_mp4

@@ -33,9 +33,14 @@ def ffmpeg_bin() -> str:
 def run_ffmpeg(args: list[str], desc: str = "ffmpeg"):
     cmd = [ffmpeg_bin(), "-y", "-hide_banner", "-loglevel", "error", *args]
     log.info("%s ...", desc)
+    log.debug("ffmpeg command: %s", " ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
-        log.error("ffmpeg failed:\n%s", proc.stderr[-4000:])
+        log.error("ffmpeg failed (exit %s)", proc.returncode)
+        if proc.stdout:
+            log.error("ffmpeg stdout:\n%s", proc.stdout[-4000:])
+        if proc.stderr:
+            log.error("ffmpeg stderr:\n%s", proc.stderr[-4000:])
         raise RuntimeError(f"{desc} failed (exit {proc.returncode})")
     return proc
 

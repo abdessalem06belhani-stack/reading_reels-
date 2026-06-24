@@ -12,14 +12,17 @@ _LEVEL_TAGS = {"A1": "#beginnerenglish", "A2": "#elementaryenglish",
 def build_metadata(script: Dict, account: Dict | None = None) -> Dict:
     level = script.get("level", "B1")
     title = script.get("title", "English Reading")
-    caption = script.get("caption") or f"{title} — read along with me. {script['lines'][0]}"
+    caption = script.get("caption")
+    if caption is None:
+        caption = f"{title} — read along with me. {script['lines'][0]}"
+    caption = str(caption).strip()
     tags = list(dict.fromkeys((script.get("hashtags") or []) + _BASE_TAGS + [_LEVEL_TAGS.get(level, "")]))
     tags = [t for t in tags if t]
     fname = f"{level.lower()}_{slugify(title)}"
     return {
         "title": title,
         "level": level,
-        "caption": caption.strip()[:200],
+        "caption": caption[:200],
         "hashtags": tags[:12],
         "filename": fname,
         "account_id": (account or {}).get("id"),

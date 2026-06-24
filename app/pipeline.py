@@ -92,7 +92,7 @@ class Pipeline:
         (job_dir / "script.json").write_text(json.dumps(script, indent=2))
         (job_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
         (job_dir / "caption.txt").write_text(
-            meta["caption"] + "\n\n" + " ".join(meta["hashtags"]))
+            str(meta.get("caption", "")) + "\n\n" + " ".join(meta.get("hashtags", [])))
         (job_dir / "timing.json").write_text(json.dumps(timing, indent=2))
         # full reading paragraph as plain text (easy to read / reuse)
         (job_dir / "paragraph.txt").write_text(script.get("paragraph") or "\n".join(lines))
