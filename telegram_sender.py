@@ -15,8 +15,8 @@ from app.utils import get_logger
 
 log = get_logger()
 
-BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
-CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
+BOT_TOKEN_ENV = "5235398298:AAF6cV32sOEuEaDak57ZE3OGUYj8CpVXerE"
+CHAT_ID_ENV = "-1002141621308"
 
 
 def send_video(file_path: str, caption: str = "",
