@@ -15,7 +15,7 @@ from app.utils import get_logger
 
 log = get_logger()
 
-BOT_TOKEN_ENV = "5235398298:AAF6cV32sOEuEaDak57ZE3OGUYj8CpVXerE"
+BOT_TOKEN_ENV = "8759505095:AAH7d1BSTITsc5uqFH9cNZHWY-G_RxnRqzA"
 CHAT_ID_ENV = "-1002141621308"
 
 
