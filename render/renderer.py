@@ -238,8 +238,9 @@ class Renderer:
         if pb.get("enabled", False):
             pb_h = pb.get("height", 4)
             pb_clr = pb.get("color", "#F5C842").lstrip("#")
+            alpha = int(pb.get("opacity", 0.85) * 255)
             vfilters += [
-                f"[outv]drawbox=x=0:y=IH-{pb_h}:w='W*t/{duration}':h={pb_h}:color=0x{pb_clr}@{pb.get('opacity',0.85)}:t=fill[outv]",
+                f"[outv]drawbox=x=0:y=H-{pb_h}:w=W*t/{duration}:h={pb_h}:color=0x{pb_clr}{alpha:02x}:t=fill[outv]",
             ]
 
         extra, afilters, alabel = self._audio_args(
@@ -304,7 +305,8 @@ class Renderer:
         if pb.get("enabled", False):
             pb_h = pb.get("height", 4)
             pb_clr = pb.get("color", "#F5C842").lstrip("#")
-            concat_expr += f";[outv]drawbox=x=0:y=IH-{pb_h}:w='W*t/{duration}':h={pb_h}:color=0x{pb_clr}@{pb.get('opacity',0.85)}:t=fill[outv]"
+            alpha = int(pb.get("opacity", 0.85) * 255)
+            concat_expr += f";[outv]drawbox=x=0:y=H-{pb_h}:w=W*t/{duration}:h={pb_h}:color=0x{pb_clr}{alpha:02x}:t=fill[outv]"
         
         extra, afilters, alabel = self._audio_args(
             audio_path, a.get("music_file") or None,
