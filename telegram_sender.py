@@ -6,17 +6,39 @@ Usage:
   python -m telegram_sender --dir path/to/job_folder
 """
 from __future__ import annotations
-import json, os, sys, argparse
+import json, os, sys, argparse, shutil, subprocess
 from pathlib import Path
 from typing import Optional
 import requests
 
-from app.utils import get_logger
+from app.utils import get_logger, ffmpeg_bin
 
 log = get_logger()
 
-BOT_TOKEN_ENV = "8759505095:AAFmj-qj5r-KrfZ_kXyS7BKRwyWiOjEr8Uo"
-CHAT_ID_ENV = "-1002141621308"
+BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
+CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
+MAX_FILE_SIZE = 48 * 1024 * 1024  # 48MB (Telegram limit is 50MB)
+
+
+def _compress(file_path: str) -> str:
+    """Re-encode video to fit under 48MB using lower bitrate/720p."""
+    out = Path(file_path).with_suffix(".compressed.mp4")
+    cmd = [ffmpeg_bin(), "-y", "-hide_banner", "-loglevel", "error",
+           "-i", file_path,
+           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+           "-vf", "scale=-2:720",
+           "-c:a", "aac", "-b:a", "64k",
+           "-fs", "48M", "-movflags", "+faststart",
+           str(out)]
+    log.info("compressing video (target < 50MB) ...")
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        log.warning("compression failed (exit %s), sending original", proc.returncode)
+        if out.exists():
+            out.unlink()
+        return file_path
+    log.info("compressed %s -> %s", file_path, out)
+    return str(out)
 
 
 def send_video(file_path: str, caption: str = "",
@@ -27,11 +49,17 @@ def send_video(file_path: str, caption: str = "",
     if not bot_token or not chat_id:
         log.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
         return False
+
+    size = os.path.getsize(file_path)
+    path = _compress(file_path) if size > MAX_FILE_SIZE else file_path
+
     url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
     cap = caption[:1024] if caption else ""
-    with open(file_path, "rb") as f:
+    with open(path, "rb") as f:
         r = requests.post(url, data={"chat_id": chat_id, "caption": cap},
                           files={"video": f}, timeout=300)
+    if path != file_path and os.path.exists(path):
+        os.unlink(path)
     if r.ok:
         log.info("sent %s to Telegram", file_path)
         return True

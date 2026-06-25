@@ -55,7 +55,8 @@ class BackgroundProvider:
         if out.exists():
             return out
         r = requests.get(url, timeout=60, stream=True)
-        r.raise_for_status()
+        if not r.ok:
+            raise RuntimeError(f"download failed ({r.status_code}) for {url[:80]}")
         with open(out, "wb") as f:
             for chunk in r.iter_content(8192):
                 f.write(chunk)
