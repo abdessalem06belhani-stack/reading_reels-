@@ -8,7 +8,7 @@ video:
   fps: 30
   duration_sec: 120        # ~2 minutes, tuned per video by the timing engine
   crf: 20                  # H.264 quality (lower = better/bigger). 18-23 sane range
-  preset: "medium"         # ffmpeg x264 preset
+  preset: "ultrafast"      # ffmpeg x264 preset
   pix_fmt: "yuv420p"       # required for TikTok/most players
 
 text:
