@@ -100,21 +100,24 @@ class Renderer:
 
         img = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        fill = _hex(text_color or self.t.get("text_color", "#FFFFFF"))
-        stroke = _hex(self.t.get("stroke_color", "#000000"))
-        sw = self.t.get("stroke_width", 6)
+        accent = _hex(self.t.get("accent_color", "#F5C842"))
+        fill = _hex(text_color or self.t.get("text_color", "#FFF8E7"))
+        stroke = _hex(self.t.get("stroke_color", "#2A1F10"))
+        sw = self.t.get("stroke_width", 2)
         shadow = self.t.get("shadow", True)
-        soff = self.t.get("shadow_offset", 5)
+        soff = self.t.get("shadow_offset", 4)
+        shadow_clr = _hex(self.t.get("shadow_color", "#1A0F05"))
 
         y = top_pad
         for font, wl, line_h, is_intro in plan:
+            actual_fill = accent + (255,) if is_intro else fill + (255,)
             for sub in wl:
                 tw = draw.textlength(sub, font=font)
                 x = (W - tw) / 2
                 if shadow:
                     draw.text((x + soff, y + soff), sub, font=font,
-                              fill=(0, 0, 0, 150), stroke_width=sw, stroke_fill=(0, 0, 0, 150))
-                draw.text((x, y), sub, font=font, fill=fill + (255,),
+                              fill=shadow_clr + (180,), stroke_width=sw, stroke_fill=shadow_clr + (180,))
+                draw.text((x, y), sub, font=font, fill=actual_fill,
                           stroke_width=sw, stroke_fill=stroke + (255,))
                 y += line_h
             y += block_gap + (40 if is_intro else 0)
@@ -226,11 +229,18 @@ class Renderer:
             bg_f = f"[0:v]scale={W}:{H},fps={fps},setsar=1,format=rgba[bg]"
 
         yexpr = self._scroll_expr(strip_h, duration)
+        pb = self.cfg.get("progress_bar", default={})
         vfilters = [
             bg_f,
             "[bg][1:v]overlay=0:0:format=auto[bgs]",
             f"[bgs][2:v]overlay=x=0:y='{yexpr}':eval=frame:format=auto[outv]",
         ]
+        if pb.get("enabled", False):
+            pb_h = pb.get("height", 4)
+            pb_clr = pb.get("color", "#F5C842").lstrip("#")
+            vfilters += [
+                f"[outv]drawbox=x=0:y=IH-{pb_h}:w='W*t/{duration}':h={pb_h}:color=0x{pb_clr}@{pb.get('opacity',0.85)}:t=fill[outv]",
+            ]
 
         extra, afilters, alabel = self._audio_args(
             audio_path, a.get("music_file") or None,
@@ -289,6 +299,12 @@ class Renderer:
         for i in range(len(images)):
             concat_expr += f"[v{i}]"
         concat_expr += f"concat=n={len(images)}:v=1[outv]"
+        
+        pb = self.cfg.get("progress_bar", default={})
+        if pb.get("enabled", False):
+            pb_h = pb.get("height", 4)
+            pb_clr = pb.get("color", "#F5C842").lstrip("#")
+            concat_expr += f";[outv]drawbox=x=0:y=IH-{pb_h}:w='W*t/{duration}':h={pb_h}:color=0x{pb_clr}@{pb.get('opacity',0.85)}:t=fill[outv]"
         
         extra, afilters, alabel = self._audio_args(
             audio_path, a.get("music_file") or None,

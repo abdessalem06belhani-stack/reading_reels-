@@ -33,10 +33,11 @@ families:
     - "a promise kept after a long time"
 
 # Visual mood queries paired with topic families (sent to the stock APIs).
+# Focused on warm, calming, premium single images for reading backgrounds.
 mood_queries:
-  daily_life: ["cozy home morning", "soft sunlight window", "calm minimal interior"]
-  work:       ["minimal desk workspace", "city office sunrise", "focused study desk"]
-  travel:     ["calm ocean horizon", "misty mountains", "quiet european street"]
-  study:      ["open book soft light", "library aesthetic", "rain on window study"]
-  motivation: ["sunrise over mountains", "calm forest path", "runner at dawn"]
-  micro_story: ["moody city night", "lonely lighthouse", "warm cafe evening"]
+  daily_life: ["warm morning light window", "cozy reading corner blanket", "soft beige calm living room", "gentle sunrise kitchen"]
+  work:       ["warm wooden desk lamp", "calm home office natural light", "minimal beige workspace", "peaceful study nook"]
+  travel:     ["calm ocean sunset", "misty forest path warm light", "quiet cobblestone street sunset", "mountain lake reflection"]
+  study:      ["open book candlelight", "warm library bookshelf", "rain window cozy room", "old books soft lamp"]
+  motivation: ["golden sunrise mountain", "calm forest stream", "sunset over peaceful field", "morning light forest path"]
+  micro_story: ["warm lamp dark room", "quiet rainy window", "coffee shop warm glow", "evening city lights rain"]

@@ -14,31 +14,41 @@ video:
 text:
   font_regular: "fonts/Lexend-Regular.ttf"   # auto-falls back to DejaVuSans if missing
   font_bold:    "fonts/Lexend-Bold.ttf"
-  intro_font_size: 86
-  body_font_size: 60
-  line_spacing: 1.28       # multiplier of font size between wrapped sub-lines
-  block_spacing: 40        # extra px between separate sentences/blocks
-  side_margin: 96          # left/right safe margin in px
-  text_color: "#FFFFFF"
-  stroke_color: "#000000"
-  stroke_width: 6          # outline for contrast over any background
+  intro_font_size: 82
+  body_font_size: 64
+  line_spacing: 1.32       # multiplier of font size between wrapped sub-lines
+  block_spacing: 44        # extra px between separate sentences/blocks
+  side_margin: 80          # left/right safe margin in px
+  # Premium warm palette — soft cream text, no harsh black stroke
+  text_color: "#FFF8E7"         # warm cream / off-white
+  accent_color: "#F5C842"       # soft gold accent (CTA text, highlights)
+  stroke_color: "#2A1F10"       # deep warm brown (soft outline)
+  stroke_width: 2               # thin soft outline (was 6)
   shadow: true
-  shadow_offset: 5
+  shadow_color: "#1A0F05"       # deep warm shadow
+  shadow_offset: 4
   scroll_direction: "up"   # "up" (credit scroll) or "static"
-  start_offset_frac: 0.10  # where the top of the strip starts (fraction of height)
-  end_visible_frac: 0.80   # keep last line above this fraction at the end
+  start_offset_frac: 0.08  # where the top of the strip starts (fraction of height)
+  end_visible_frac: 0.82   # keep last line above this fraction at the end
 
 scrim:
   enabled: true            # dark contrast layer between bg and text
-  opacity: 0.42            # 0..1 overall darkening
+  opacity: 0.35            # 0..1 overall darkening (lighter = more bg visible)
   vignette: true           # stronger darkening top & bottom
+
+# Progress bar at bottom — shows reading progress to boost retention
+progress_bar:
+  enabled: true
+  height: 4                # px
+  color: "#F5C842"         # gold accent
+  opacity: 0.85            # 0..1
 
 background:
   source_priority: ["pexels", "pixabay", "gradient"]  # tried in order
-  media_type: "auto"       # "image", "video", or "auto" (prefer video then image)
+  media_type: "image"      # "image" (single image per video — calming, professional)
   orientation: "portrait"
   kenburns: true           # slow zoom/pan on still images
-  kenburns_zoom: 1.10      # max zoom factor over the clip
+  kenburns_zoom: 1.08      # max zoom factor over the clip (gentler = less motion sickness)
   cache_dir: "assets/cache"
   dedup: true              # never reuse the same asset id twice (per account)
 
