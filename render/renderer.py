@@ -157,10 +157,11 @@ class Renderer:
 
     # ------------------------------------------------------------------
     def _audio_args(self, audio_path: Optional[str], music: Optional[str],
-                    music_gain: int, voice_gain: int, duration: float):
+                    music_gain: int, voice_gain: int, duration: float,
+                    start_idx: int = 3):
         """Return (extra_inputs, filter_str, out_label). Always yields audio."""
         extra, filt = [], []
-        idx = 3  # inputs 0,1,2 are bg/scrim/strip
+        idx = start_idx
         voice_lbl = music_lbl = None
         if audio_path:
             extra += ["-i", audio_path]
@@ -233,7 +234,8 @@ class Renderer:
 
         extra, afilters, alabel = self._audio_args(
             audio_path, a.get("music_file") or None,
-            a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration)
+            a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration,
+            start_idx=3)
 
         filter_complex = ";".join(vfilters + afilters)
         if alabel is None:
@@ -290,7 +292,8 @@ class Renderer:
         
         extra, afilters, alabel = self._audio_args(
             audio_path, a.get("music_file") or None,
-            a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration)
+            a.get("music_gain_db", -22), a.get("voice_gain_db", 0), duration,
+            start_idx=len(images) * 3)
 
         filter_complex = concat_expr + ";" + ";".join(afilters)
         
