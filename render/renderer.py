@@ -239,8 +239,10 @@ class Renderer:
             pb_h = pb.get("height", 4)
             pb_clr = pb.get("color", "#F5C842").lstrip("#")
             pb_op = pb.get("opacity", 0.85)
+            alpha_hex = f"{int(pb_op * 255):02x}"
             vfilters += [
-                f"[outv]drawbox=x=0:y={H - pb_h}:w={W}*n/({fps}*{duration}):h={pb_h}:color=0x{pb_clr}@{pb_op}:t=fill[outv]",
+                f"color=c=0x{pb_clr}{alpha_hex}:s={W}x{pb_h}:r={fps}:d={duration}[bar]",
+                f"[outv][bar]overlay=x='-{W}*({duration}-t)/{duration}':y={H-pb_h}:eval=frame:format=auto[outv]",
             ]
 
         extra, afilters, alabel = self._audio_args(
