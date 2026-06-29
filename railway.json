@@ -6,6 +6,8 @@
   },
   "deploy": {
     "startCommand": "python -m telegram_bot.bot",
-    "restartPolicyType": "ALWAYS"
+    "restartPolicyType": "ALWAYS",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 300
   }
 }

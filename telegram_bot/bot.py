@@ -5,15 +5,11 @@ Interactive video customization + generation + delivery.
 Start:  python -m telegram_bot.bot
 """
 from __future__ import annotations
-import os, asyncio, logging, threading, tempfile, time
+import os, asyncio, threading, tempfile
 from collections import defaultdict
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-from telegram.request import HTTPXRequest
-
-logger = logging.getLogger(__name__)
-import telegram
 
 from app.config_loader import load_config
 from app.pipeline import Pipeline
@@ -270,7 +266,7 @@ async def run_generation(callback_query, chat_id):
             results.append(r)
             vid_path = r["video"]
             meta = r.get("meta", {})
-            caption = str(meta.get("caption", ""))[:1000]
+            caption = meta.get("caption", "")[:1000]
             with open(vid_path, "rb") as f:
                 await callback_query.message.reply_video(
                     video=f, caption=f"{'🔊' if voice else '🔇'} مستوى {level} | {meta.get('title', '')}\n\n{caption}",
@@ -285,30 +281,6 @@ async def run_generation(callback_query, chat_id):
     )
 
 
-# ── error callback for polling resilience ─────────────────────
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log errors caused by updates and continue running.
-    Conflict errors are expected during Railway redeployments when the old
-    container hasn't fully stopped yet — we log them at WARNING level and
-    carry on instead of crashing."""
-    import telegram.error
-    if isinstance(context.error, telegram.error.Conflict):
-        logger.warning("Conflict error (another instance may still be shutting down) — retrying automatically.")
-        return
-    logger.error("Exception while handling an update: %s", context.error, exc_info=context.error)
-
-
-async def post_init(application) -> None:
-    """Called after Application.initialize().
-    Force-clears any existing polling session so the NEW container wins
-    the getUpdates race during Railway redeployments."""
-    logger.info("Clearing previous polling session (deleteWebhook + drop_pending_updates)...")
-    await application.bot.delete_webhook(drop_pending_updates=True)
-    # Give the old container a few seconds to realise it lost the race and exit.
-    await asyncio.sleep(5)
-    logger.info("Ready to start polling.")
-
-
 # ── main ──────────────────────────────────────────────────────
 def main():
     global cfg
@@ -319,83 +291,14 @@ def main():
         print("ERROR: TELEGRAM_BOT_TOKEN not set in environment.")
         return
 
-    # Custom request with generous timeouts and connection pool to
-    # prevent httpcore.ReadError on long-polling connections.
-    request = HTTPXRequest(
-        connection_pool_size=8,
-        read_timeout=30,
-        write_timeout=30,
-        connect_timeout=15,
-        pool_timeout=10,
-    )
-
-    app = (
-        Application.builder()
-        .token(token)
-        .request(request)
-        .get_updates_request(
-            HTTPXRequest(
-                connection_pool_size=8,
-                read_timeout=60,       # long-polling reads can take a while
-                write_timeout=30,
-                connect_timeout=15,
-                pool_timeout=10,
-            )
-        )
-        .post_init(post_init)
-        .build()
-    )
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_error_handler(error_handler)
 
     print("Bot is running... Press Ctrl+C to stop.")
-    # If a webhook URL is provided (e.g. via Railway env), prefer webhooks
-    # to avoid getUpdates races. Otherwise fall back to resilient polling.
-    webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
-    port = int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", 8443)))
-
-    if webhook_url:
-        url_path = os.getenv("TELEGRAM_WEBHOOK_PATH", "/")
-        try:
-            app.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                url_path=url_path,
-                webhook_url=webhook_url,
-                drop_pending_updates=True,
-            )
-        except Exception as e:
-            logger.error("Webhook mode failed: %s", e, exc_info=e)
-            raise
-    else:
-        # Run polling inside a loop so Conflict errors (another
-        # getUpdates client still running) don't crash the process.
-        # Retry with a short backoff so the new container can win
-        # the getUpdates race during redeploys (common on Railway).
-        while True:
-            try:
-                app.run_polling(
-                    drop_pending_updates=True,
-                    allowed_updates=Update.ALL_TYPES,
-                    poll_interval=2.0,       # slightly slower to reduce conflict window
-                    timeout=30,
-                )
-                break
-            except telegram.error.Conflict:
-                logger.warning("Conflict detected: another getUpdates client is running — retrying in 5s.")
-                time.sleep(5)
-                continue
-            except KeyboardInterrupt:
-                logger.info("Shutdown requested by user.")
-                break
-            except Exception as e:
-                logger.error("Unhandled exception in polling loop: %s", e, exc_info=e)
-                time.sleep(5)
-                continue
+    app.run_polling()
 
 
 if __name__ == "__main__":
     main()
-
