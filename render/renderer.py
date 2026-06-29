@@ -16,7 +16,7 @@ first second to the last, which is the core retention mechanic.
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import numpy as np
 import random
 
