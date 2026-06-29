@@ -145,7 +145,7 @@ class Renderer:
         img = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         accent = lvl_accent
-        fill = _hex(text_color or lvl_fill)
+        fill = _hex(text_color) if text_color else lvl_fill
         stroke = lvl_stroke
         sw = self.t.get("stroke_width", 5)
         shadow = self.t.get("shadow", True)
