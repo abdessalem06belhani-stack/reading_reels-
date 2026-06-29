@@ -79,8 +79,9 @@ class Renderer:
 
     # ------------------------------------------------------------------
     def _draw_glow(self, draw, x, y, text, font, glow_color, glow_radius):
-        """Draw a soft glow behind text by drawing multiple blurred layers."""
-        gc = glow_color
+        """Draw a soft glow behind text by drawing multiple blurred layers.
+        glow_color: 3-element RGB tuple (no alpha)."""
+        gc = glow_color[:3]  # ensure 3-element RGB
         for r in range(glow_radius, 0, -1):
             alpha = max(30, 120 - r * 15)
             offsets = [(x + r, y), (x - r, y), (x, y + r), (x, y - r),
