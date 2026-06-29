@@ -71,8 +71,9 @@ class Pipeline:
         timing = build_timing(lines, level_spec.get("words_per_minute", 100), target)
         duration = float(min(max(timing["total"], target * 0.8), target * 1.2))
 
-        # 4) background
-        background = self.bg.get(queries, account=(account or {}).get("id", "default"), use_slideshow=use_slideshow)
+        # 4) background (check config for slideshow default)
+        slideshow = use_slideshow or self.cfg.get("background", "slideshow_enabled", default=False)
+        background = self.bg.get(queries, account=(account or {}).get("id", "default"), use_slideshow=slideshow)
 
         # 5) build output job folder
         meta = build_metadata(script, account,
@@ -89,10 +90,13 @@ class Pipeline:
             audio_path = self.tts.intro_track(intro, wav)
             audio_path = str(audio_path) if audio_path else None
 
-        # 7) render
+        # 7) level colors
+        level_colors = level_spec.get("colors") if level_spec else None
+
+        # 8) render
         strip_png = job_dir / "text_strip.png"
         scrim_png = job_dir / "scrim.png"
-        _, _, strip_h = self.renderer.build_text_strip(intro, lines, strip_png, text_color=text_color)
+        _, _, strip_h = self.renderer.build_text_strip(intro, lines, strip_png, text_color=text_color, level_colors=level_colors)
         self.renderer.build_scrim(scrim_png)
         out_mp4 = job_dir / f"{meta['filename']}.mp4"
         self.renderer.compose(background, strip_png, strip_h, scrim_png,

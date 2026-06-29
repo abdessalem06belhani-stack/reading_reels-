@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import requests
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageEnhance
 
 from app.utils import get_logger, load_used, save_used, ensure_dir
 
@@ -144,10 +144,15 @@ class BackgroundProvider:
             for p in r.json().get("photos", []):
                 if self._seen(account, "pexels_p", p["id"]):
                     continue
-                url = p["src"].get("portrait") or p["src"].get("large2x") or p["src"]["original"]
+                # Use highest quality: original first, then large2x, then portrait
+                img_quality = self.bg.get("image_quality", "high")
+                if img_quality == "high":
+                    url = p["src"].get("original") or p["src"].get("large2x") or p["src"]["portrait"]
+                else:
+                    url = p["src"].get("portrait") or p["src"].get("large2x") or p["src"]["original"]
                 path = self._download(url, ".jpg")
                 self._mark(account, "pexels_p", p["id"])
-                log.info("background: pexels photo #%s (%s)", p["id"], q)
+                log.info("background: pexels photo #%s (%s) [%s]", p["id"], q, img_quality)
                 return {"type": "image", "path": str(self._fit_image(path)), "source": src_tag}
         return None
 
@@ -163,7 +168,11 @@ class BackgroundProvider:
             for p in r.json().get("photos", []):
                 if self._seen(account, "pexels_p", p["id"]):
                     continue
-                url = p["src"].get("portrait") or p["src"].get("large2x") or p["src"]["original"]
+                img_quality = self.bg.get("image_quality", "high")
+                if img_quality == "high":
+                    url = p["src"].get("original") or p["src"].get("large2x") or p["src"]["portrait"]
+                else:
+                    url = p["src"].get("portrait") or p["src"].get("large2x") or p["src"]["original"]
                 path = self._download(url, ".jpg")
                 self._mark(account, "pexels_p", p["id"])
                 return str(self._fit_image(path))
@@ -219,9 +228,37 @@ class BackgroundProvider:
         return None
 
     # ---- helpers ------------------------------------------------------
+    def _enhance_image(self, img: Image.Image) -> Image.Image:
+        """Apply image enhancement: sharpen, contrast boost, saturation boost."""
+        bg_cfg = self.bg
+        if not bg_cfg.get("enhance_image", True):
+            return img
+        
+        # Unsharp mask via sharpness enhancement
+        sharpen = float(bg_cfg.get("sharpen_amount", 0.3))
+        if sharpen > 0:
+            enhancer = ImageEnhance.Sharpness(img)
+            img = enhancer.enhance(1.0 + sharpen)
+        
+        # Contrast
+        contrast = float(bg_cfg.get("contrast_boost", 1.05))
+        if contrast != 1.0:
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(contrast)
+        
+        # Saturation
+        saturation = float(bg_cfg.get("saturation_boost", 1.10))
+        if saturation != 1.0:
+            enhancer = ImageEnhance.Color(img)
+            img = enhancer.enhance(saturation)
+        
+        return img
+
     def _fit_image(self, path: Path) -> Path:
         """Center-crop/scale any image to exactly WxH so ffmpeg has clean input."""
         img = Image.open(path).convert("RGB")
+        # Enhance before resize
+        img = self._enhance_image(img)
         tw, th = self.W, self.H
         sw, sh = img.size
         scale = max(tw / sw, th / sh)
@@ -230,7 +267,7 @@ class BackgroundProvider:
         left, top = (nw - tw) // 2, (nh - th) // 2
         img = img.crop((left, top, left + tw, top + th))
         out = path.with_suffix(".fit.jpg")
-        img.save(out, quality=90)
+        img.save(out, quality=95)  # Increased quality from 90 to 95
         return out
 
     def _gradient(self, account) -> Dict:

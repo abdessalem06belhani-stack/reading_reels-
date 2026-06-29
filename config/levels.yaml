@@ -1,5 +1,6 @@
 # CEFR reading levels. The timing engine uses words_per_minute to fit ~2 min.
 # max_words_per_line keeps lines short enough to read in one glance (retention).
+# Each level has a color scheme for text rendering (accent, text, highlight, stroke).
 A1:
   name: "Beginner"
   max_words_per_line: 5
@@ -9,6 +10,11 @@ A1:
   sentence_style: "very short, concrete, one idea per sentence"
   hook: "a familiar daily-life moment (waking up, coffee, going to school)"
   ending: "a calm, complete thought that gently invites a re-watch"
+  colors:
+    accent: "#FFD700"        # gold - intro phrases
+    text: "#FFFFFF"          # white - body text
+    highlight: "#FFD700"     # gold - keyword highlights
+    stroke: "#000000"        # black - text outline
 
 A2:
   name: "Elementary"
@@ -19,6 +25,11 @@ A2:
   sentence_style: "short, clear, simple connectors (and, but, because)"
   hook: "a small relatable problem or wish"
   ending: "a light, satisfying resolution"
+  colors:
+    accent: "#4FC3F7"        # sky blue
+    text: "#FFFFFF"
+    highlight: "#4FC3F7"
+    stroke: "#000000"
 
 B1:
   name: "Intermediate"
@@ -29,6 +40,11 @@ B1:
   sentence_style: "medium length, some subordinate clauses"
   hook: "a question or mild tension the reader wants resolved"
   ending: "a reflective line that lands the idea"
+  colors:
+    accent: "#81C784"        # soft green
+    text: "#FFFFFF"
+    highlight: "#81C784"
+    stroke: "#000000"
 
 B2:
   name: "Upper-Intermediate"
@@ -39,6 +55,11 @@ B2:
   sentence_style: "flowing sentences, controlled complexity"
   hook: "an intriguing claim or contrast"
   ending: "a thoughtful, slightly open-ended payoff"
+  colors:
+    accent: "#CE93D8"        # lavender
+    text: "#FFFFFF"
+    highlight: "#CE93D8"
+    stroke: "#000000"
 
 C1:
   name: "Advanced"
@@ -49,3 +70,8 @@ C1:
   sentence_style: "sophisticated, rhythmic, well-structured"
   hook: "a sharp insight or paradox"
   ending: "a memorable, quotable final line"
+  colors:
+    accent: "#FF8A65"        # coral
+    text: "#FFFFFF"
+    highlight: "#FF8A65"
+    stroke: "#000000"

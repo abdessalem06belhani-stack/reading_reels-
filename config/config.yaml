@@ -7,48 +7,62 @@ video:
   height: 1920
   fps: 30
   duration_sec: 120        # ~2 minutes, tuned per video by the timing engine
-  crf: 20                  # H.264 quality (lower = better/bigger). 18-23 sane range
-  preset: "ultrafast"      # ffmpeg x264 preset
+  crf: 18                  # H.264 quality (lower = better/bigger). 18-23 sane range. 18 = near-lossless
+  preset: "slow"           # ffmpeg x264 preset: ultrafast->superfast->veryfast->faster->fast->medium->slow->slower->veryslow
   pix_fmt: "yuv420p"       # required for TikTok/most players
+  bitrate: "8000k"         # video bitrate for HD quality (TikTok supports up to 8Mbps)
+  max_bitrate: "12000k"    # peak bitrate for complex scenes
+  audio_bitrate: "192k"    # AAC audio bitrate
+  profile: "high"          # H.264 profile (high = better quality, TikTok compatible)
+  level: "4.1"             # H.264 level for 1080p30
+  tune: "stillimage"       # optimize for slideshow/image backgrounds
 
 text:
   font_regular: "fonts/Lexend-Regular.ttf"   # auto-falls back to DejaVuSans if missing
   font_bold:    "fonts/Lexend-Bold.ttf"
   intro_font_size: 82
-  body_font_size: 64
-  line_spacing: 1.32       # multiplier of font size between wrapped sub-lines
-  block_spacing: 44        # extra px between separate sentences/blocks
-  side_margin: 80          # left/right safe margin in px
-  # Premium warm palette — soft cream text, no harsh black stroke
-  text_color: "#FFF8E7"         # warm cream / off-white
-  accent_color: "#F5C842"       # soft gold accent (CTA text, highlights)
-  stroke_color: "#2A1F10"       # deep warm brown (soft outline)
-  stroke_width: 2               # thin soft outline (was 6)
+  body_font_size: 56
+  line_spacing: 1.35       # multiplier of font size between wrapped sub-lines
+  block_spacing: 48        # extra px between separate sentences/blocks
+  side_margin: 72          # left/right safe margin in px
+  text_color: "#FFFFFF"
+  text_gradient: true      # enable gradient text effect (top->bottom fade)
+  text_gradient_colors: ["#FFFFFF", "#E0E0FF"]  # top to bottom gradient
+  stroke_color: "#000000"
+  stroke_width: 5          # outline for contrast over any background
   shadow: true
-  shadow_color: "#1A0F05"       # deep warm shadow
   shadow_offset: 4
+  glow: true               # subtle glow behind text for extra pop
+  glow_color: "#4488FF"    # blue glow
+  glow_radius: 8           # glow spread in px
   scroll_direction: "up"   # "up" (credit scroll) or "static"
-  start_offset_frac: 0.08  # where the top of the strip starts (fraction of height)
+  start_offset_frac: 0.10  # where the top of the strip starts (fraction of height)
   end_visible_frac: 0.82   # keep last line above this fraction at the end
+  entrance_animation: "fade"  # "none", "fade", "slide" (text fades/slides in per block)
+  highlight_keywords: true    # auto-highlight important words (first word of each sentence)
+  highlight_color: "#FFD700"  # gold for keyword highlights
 
 scrim:
   enabled: true            # dark contrast layer between bg and text
   opacity: 0.35            # 0..1 overall darkening (lighter = more bg visible)
   vignette: true           # stronger darkening top & bottom
-
-# Progress bar at bottom — shows reading progress to boost retention
-progress_bar:
-  enabled: true
-  height: 4                # px
-  color: "#F5C842"         # gold accent
-  opacity: 0.85            # 0..1
+  vignette_strength: 0.25  # how strong the edge darkening is
+  blur_overlay: true       # slight gaussian blur on scrim for premium look
+  blur_radius: 2           # blur radius in px
 
 background:
   source_priority: ["pexels", "pixabay", "gradient"]  # tried in order
-  media_type: "image"      # "image" (single image per video — calming, professional)
+  media_type: "image"      # "image", "video", or "auto" (use IMAGE for best HD quality)
   orientation: "portrait"
+  image_quality: "high"    # "high" (download largest) or "balanced"
   kenburns: true           # slow zoom/pan on still images
-  kenburns_zoom: 1.08      # max zoom factor over the clip (gentler = less motion sickness)
+  kenburns_zoom: 1.08      # max zoom factor over the clip
+  slideshow_enabled: false  # change images every ~5s instead of one static bg
+  slideshow_image_count: 8  # number of images for slideshow
+  enhance_image: true      # auto-enhance: sharpen + contrast + color grade
+  sharpen_amount: 0.3      # unsharp mask amount
+  contrast_boost: 1.05     # slight contrast increase
+  saturation_boost: 1.10   # slight color saturation increase
   cache_dir: "assets/cache"
   dedup: true              # never reuse the same asset id twice (per account)
 
