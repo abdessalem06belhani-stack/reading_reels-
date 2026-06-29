@@ -1,111 +1,89 @@
+# =====================================================================
+# reading_reels — generate-reading-videos
+# Trigger: manual (workflow_dispatch) or daily cron (07:00 UTC)
+# =====================================================================
 name: generate-reading-videos
 
 on:
   workflow_dispatch:
     inputs:
-      # ===== VIDEO CONTENT =====
+      # ================================================================
+      # 🎯 CONTENT
+      # ================================================================
       level:
-        description: 'CEFR Level (A1 = Beginner, C1 = Advanced)'
+        description: '🎯 CEFR Level'
         required: true
         default: 'B1'
         type: choice
         options: [A1, A2, B1, B2, C1]
+      multi_level:
+        description: '▶ Generate across MULTIPLE levels? (overrides single level pick)'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'all (A1-C1)'
+          - 'easy (A1-A2)'
+          - 'medium (B1-B2)'
+          - 'hard (B2-C1)'
       topic:
-        description: 'Topic override (leave blank for random)'
+        description: 'Topic override (leave blank for random per video)'
         required: false
         default: ''
         type: string
       count:
-        description: 'Number of videos to generate'
+        description: 'Number of videos per level'
         required: true
         default: '1'
         type: choice
         options: ['1', '2', '3', '5', '10']
       duration:
-        description: 'Target video duration in seconds (60-180)'
+        description: 'Target duration per video (seconds)'
         required: false
         default: '120'
         type: string
       seed:
-        description: 'Random seed for reproducibility (leave blank for random)'
+        description: 'Random seed (blank = random, same seed = reproducible)'
         required: false
         default: ''
         type: string
 
-      # ===== TEXT STYLING =====
-      text_font:
-        description: 'Text font family'
-        required: false
-        default: 'DejaVuSans'
-        type: choice
-        options: ['DejaVuSans', 'DejaVuSans-Bold', 'Courier', 'Arial']
-      text_size_intro:
-        description: 'Intro text size (pixels, 60-120)'
-        required: false
-        default: '86'
-        type: string
-      text_size_body:
-        description: 'Body text size (pixels, 40-90)'
-        required: false
-        default: '60'
-        type: string
-      text_color:
-        description: 'Text color (hex: #RRGGBB, default white)'
-        required: false
-        default: '#FFFFFF'
-        type: string
-      text_stroke_width:
-        description: 'Text stroke/outline width (pixels, 1-5)'
-        required: false
-        default: '2'
-        type: string
-      text_scroll_speed:
-        description: 'Text scroll animation speed (0.5-3x, default 1.0)'
-        required: false
-        default: '1.0'
-        type: string
-
-      # ===== BACKGROUND =====
-      background_source:
-        description: 'Background media source'
-        required: false
-        default: 'auto'
-        type: choice
-        options: ['auto', 'pexels', 'pixabay']
-      mood_override:
-        description: 'Override background mood query (e.g., "cozy morning")'
-        required: false
-        default: ''
-        type: string
+      # ================================================================
+      # 🖼️ BACKGROUND
+      # ================================================================
       use_slideshow:
-        description: 'Use slideshow mode: multiple images changing every ~5 seconds instead of single video'
+        description: 'Slideshow mode (multiple images change every ~5s)'
         required: false
         default: false
         type: boolean
 
-      # ===== AUDIO & NARRATION =====
+      # ================================================================
+      # 📝 TEXT STYLE
+      # ================================================================
+      text_color:
+        description: 'Text color hex (#RRGGBB, blank = per-level default)'
+        required: false
+        default: ''
+        type: string
+
+      # ================================================================
+      # 🔊 AUDIO
+      # ================================================================
       enable_narration:
-        description: 'Enable full-text narration'
+        description: 'Voice narration (intro phrases + full text)'
         required: false
         default: true
         type: boolean
       tts_speed:
-        description: 'TTS speed multiplier (0.8-1.5)'
+        description: 'TTS reading speed (0.8 = slow, 1.5 = fast)'
         required: false
         default: '1.0'
         type: string
-      background_music:
-        description: 'Include background music'
-        required: false
-        default: true
-        type: boolean
-      music_gain:
-        description: 'Background music volume in dB (-30 to -10, default -22)'
-        required: false
-        default: '-22'
-        type: string
 
-      # ===== METADATA & PUBLISHING =====
+      # ================================================================
+      # 📤 METADATA & PUBLISHING
+      # ================================================================
       title_override:
         description: 'Override video title'
         required: false
@@ -122,40 +100,165 @@ on:
         default: ''
         type: string
       auto_upload_tiktok:
-        description: 'Auto-upload to TikTok (requires account setup)'
+        description: 'Auto-upload to TikTok (requires credentials)'
         required: false
         default: false
         type: boolean
       send_telegram:
-        description: 'Send result to Telegram'
+        description: 'Send result video to Telegram'
         required: true
         default: true
         type: boolean
       telegram_chat_override:
-        description: 'Telegram chat ID override (leave blank to use secret)'
+        description: 'Telegram chat ID (blank = use secret from Settings)'
         required: false
         default: ''
         type: string
 
+      # ================================================================
+      # 🧪 ADVANCED
+      # ================================================================
+      dry_run:
+        description: '🔬 Dry-run: validate config & print args without generating'
+        required: false
+        default: false
+        type: boolean
+
   schedule:
     - cron: "0 7 * * *"
 
+  workflow_call:
+    inputs:
+      level:
+        required: false
+        type: string
+        default: 'B1'
+      count:
+        required: false
+        type: number
+        default: 1
+      topic:
+        required: false
+        type: string
+        default: ''
+      send_telegram:
+        required: false
+        type: boolean
+        default: false
+
+# ---------------------------------------------------------------
+# CONCURRENCY — cancel overlapping runs from the same branch/ref
+# ---------------------------------------------------------------
+concurrency:
+  group: generate-${{ github.ref }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------
+# ENV defaults (overridable per step)
+# ---------------------------------------------------------------
+env:
+  PYTHON_VERSION: "3.12"
+  FFMPEG_CACHE_DIR: /tmp/ffmpeg_cache
+
 jobs:
+  # ==============================================================
+  # JOB 1: validate — check inputs BEFORE spending CI minutes
+  # ==============================================================
+  validate:
+    name: 🔍 Validate inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      levels: ${{ steps.resolve-levels.outputs.levels }}
+      levels_json: ${{ steps.resolve-levels.outputs.levels_json }}
+      dry_run: ${{ steps.parse-inputs.outputs.dry_run }}
+      count: ${{ steps.parse-inputs.outputs.count }}
+      duration: ${{ steps.parse-inputs.outputs.duration }}
+      tts_speed: ${{ steps.parse-inputs.outputs.tts_speed }}
+    steps:
+      - name: Resolve levels
+        id: resolve-levels
+        shell: bash
+        run: |
+          # Convert multi_level pick to a JSON array
+          ML="${{ inputs.multi_level || 'none' }}"
+          SINGLE="${{ inputs.level || 'B1' }}"
+
+          if [ "$ML" = "none" ]; then
+            LEVELS="[\"$SINGLE\"]"
+          else
+            case "$ML" in
+              "all (A1-C1)") LEVELS='["A1","A2","B1","B2","C1"]' ;;
+              "easy (A1-A2)") LEVELS='["A1","A2"]' ;;
+              "medium (B1-B2)") LEVELS='["B1","B2"]' ;;
+              "hard (B2-C1)") LEVELS='["B2","C1"]' ;;
+              *) LEVELS="[\"$SINGLE\"]" ;;
+            esac
+          fi
+
+          echo "levels=$LEVELS" | tee -a "$GITHUB_OUTPUT"
+          echo "levels_json=$LEVELS" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Parse numeric inputs
+        id: parse-inputs
+        shell: bash
+        run: |
+          # Validate & coerce
+          CNT=${{ inputs.count || 1 }}
+          DUR=${{ inputs.duration || 120 }}
+          TTS=${{ inputs.tts_speed || 1.0 }}
+
+          # bounds
+          if [ "$CNT" -lt 1 ] 2>/dev/null; then CNT=1; fi
+          if [ "$CNT" -gt 20 ] 2>/dev/null; then CNT=20; fi
+          if [ "$DUR" -lt 30 ] 2>/dev/null; then DUR=30; fi
+          if [ "$DUR" -gt 300 ] 2>/dev/null; then DUR=300; fi
+          TTS_VALID=$(echo "$TTS" | awk '{if($1<0.5) print 0.5; else if($1>2.0) print 2.0; else print $1}')
+
+          echo "count=$CNT" | tee -a "$GITHUB_OUTPUT"
+          echo "duration=$DUR" | tee -a "$GITHUB_OUTPUT"
+          echo "tts_speed=$TTS_VALID" | tee -a "$GITHUB_OUTPUT"
+
+          # Dry-run
+          DRY="${{ inputs.dry_run || 'false' }}"
+          echo "dry_run=$DRY" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Print resolved parameters
+        shell: bash
+        run: |
+          echo "### ✅ Validated" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Levels: ${{ steps.resolve-levels.outputs.levels }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Count/level: ${{ inputs.count || 1 }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Duration: ${{ inputs.duration || 120 }}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "- TTS speed: ${{ inputs.tts_speed || 1.0 }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dry-run: ${{ inputs.dry_run || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ==============================================================
+  # JOB 2: generate — matrix over resolved levels
+  # ==============================================================
   generate:
+    name: 🎬 ${{ matrix.level }}
+    needs: [validate]
+    if: fromJSON(needs.validate.outputs.dry_run) == false
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false          # keep going if one level fails
+      matrix:
+        level: ${{ fromJSON(needs.validate.outputs.levels_json) }}
+
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Restore dedup DB
         uses: actions/cache@v6
         with:
           path: assets/used_assets.json
-          key: used-assets-${{ github.run_id }}
+          key: used-assets-${{ github.run_id }}-${{ matrix.level }}
           restore-keys: used-assets-
 
       - name: Install dependencies
@@ -168,94 +271,200 @@ jobs:
         run: python -m app.main doctor
 
       - name: Generate videos
+        id: generate
+        shell: bash
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          # Video generation parameters
-          GH_DURATION: ${{ inputs.duration }}
-          GH_SEED: ${{ inputs.seed }}
-          GH_TEXT_FONT: ${{ inputs.text_font }}
-          GH_TEXT_SIZE_INTRO: ${{ inputs.text_size_intro }}
-          GH_TEXT_SIZE_BODY: ${{ inputs.text_size_body }}
-          GH_TEXT_COLOR: ${{ inputs.text_color }}
-          GH_TEXT_STROKE_WIDTH: ${{ inputs.text_stroke_width }}
-          GH_TEXT_SCROLL_SPEED: ${{ inputs.text_scroll_speed }}
-          GH_BACKGROUND_SOURCE: ${{ inputs.background_source }}
-          GH_MOOD_OVERRIDE: ${{ inputs.mood_override }}
-          GH_USE_SLIDESHOW: ${{ inputs.use_slideshow }}
-          GH_ENABLE_NARRATION: ${{ inputs.enable_narration }}
-          GH_TTS_SPEED: ${{ inputs.tts_speed }}
-          GH_BACKGROUND_MUSIC: ${{ inputs.background_music }}
-          GH_MUSIC_GAIN: ${{ inputs.music_gain }}
-          GH_TITLE_OVERRIDE: ${{ inputs.title_override }}
-          GH_CAPTION_OVERRIDE: ${{ inputs.caption_override }}
-          GH_HASHTAGS_OVERRIDE: ${{ inputs.hashtags_override }}
-          GH_AUTO_UPLOAD: ${{ inputs.auto_upload_tiktok }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Build CLI arguments from inputs
-            ARGS="batch --count ${{ inputs.count }} --level ${{ inputs.level }}"
-            
-            # Optional topic
-            if [ -n "${{ inputs.topic }}" ]; then
-              ARGS="$ARGS --topic \"${{ inputs.topic }}\""
-            fi
-            
-            # Optional seed
-            if [ -n "${{ inputs.seed }}" ]; then
-              ARGS="$ARGS --seed ${{ inputs.seed }}"
-            fi
-            
-            # Optional title, caption, hashtags
-            if [ -n "${{ inputs.title_override }}" ]; then
-              ARGS="$ARGS --title \"${{ inputs.title_override }}\""
-            fi
-            if [ -n "${{ inputs.caption_override }}" ]; then
-              ARGS="$ARGS --caption \"${{ inputs.caption_override }}\""
-            fi
-            if [ -n "${{ inputs.hashtags_override }}" ]; then
-              ARGS="$ARGS --hashtags \"${{ inputs.hashtags_override }}\""
-            fi
-            
-            # Optional auto-upload
-            if [ "${{ inputs.auto_upload_tiktok }}" = "true" ]; then
-              ARGS="$ARGS --auto-upload"
-            fi
-            
-            # Disable narration if specified
-            if [ "${{ inputs.enable_narration }}" = "false" ]; then
-              ARGS="$ARGS --no-audio"
-            fi
-            
-            # Enable slideshow if specified
-            if [ "${{ inputs.use_slideshow }}" = "true" ]; then
-              ARGS="$ARGS --slideshow"
-            fi
-            
-            python -m app.main $ARGS
-          else
-            # Scheduled run: use default settings
-            python -m app.main accounts
+          # Build CLI args from workflow inputs
+          ARGS="batch --count ${{ needs.validate.outputs.count }} --level ${{ matrix.level }} --duration ${{ needs.validate.outputs.duration }} --tts-speed ${{ needs.validate.outputs.tts_speed }}"
+
+          # Optional topic
+          if [ -n "${{ inputs.topic }}" ]; then
+            ARGS="$ARGS --topic \"${{ inputs.topic }}\""
           fi
 
+          # Optional seed
+          if [ -n "${{ inputs.seed }}" ]; then
+            ARGS="$ARGS --seed ${{ inputs.seed }}"
+          fi
+
+          # Optional title / caption / hashtags
+          if [ -n "${{ inputs.title_override }}" ]; then
+            ARGS="$ARGS --title \"${{ inputs.title_override }}\""
+          fi
+          if [ -n "${{ inputs.caption_override }}" ]; then
+            ARGS="$ARGS --caption \"${{ inputs.caption_override }}\""
+          fi
+          if [ -n "${{ inputs.hashtags_override }}" ]; then
+            ARGS="$ARGS --hashtags \"${{ inputs.hashtags_override }}\""
+          fi
+
+          # Text color
+          if [ -n "${{ inputs.text_color }}" ]; then
+            ARGS="$ARGS --text-color \"${{ inputs.text_color }}\""
+          fi
+
+          # Boolean flags
+          if [ "${{ inputs.enable_narration || 'true' }}" = "false" ]; then
+            ARGS="$ARGS --no-audio"
+          fi
+          if [ "${{ inputs.use_slideshow || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --slideshow"
+          fi
+          if [ "${{ inputs.auto_upload_tiktok || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --auto-upload"
+          fi
+
+          echo "Running: python -m app.main $ARGS"
+          python -m app.main $ARGS
+
+      - name: Generate step summary
+        if: always()           # run even if generation failed
+        shell: bash
+        run: |
+          {
+            echo "### 🎬 Level ${{ matrix.level }}"
+            echo "- Count: ${{ needs.validate.outputs.count }}"
+            if [ -d "outputs/jobs" ]; then
+              echo "- Jobs: $(ls -d outputs/jobs/*/ 2>/dev/null | wc -l)"
+              echo "- Output: \`outputs/jobs/\`"
+              for d in outputs/jobs/*/; do
+                if [ -f "$d/metadata.json" ]; then
+                  NAME=$(python -c "import json; print(json.load(open('${d}metadata.json')).get('filename','?'))")
+                  echo "  - ✅ $NAME"
+                fi
+              done
+            else
+              echo "- ⚠️  No output directory"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Send to Telegram
-        if: github.event_name == 'workflow_dispatch' && fromJSON(inputs.send_telegram)
+        if: |
+          always()
+          && github.event_name == 'workflow_dispatch'
+          && fromJSON(github.event.inputs.send_telegram || 'true')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ inputs.telegram_chat_override || secrets.TELEGRAM_CHAT_ID }}
         run: |
-          for dir in outputs/jobs/*/; do
-            if [ -d "$dir" ]; then
-              python telegram_sender.py --dir "$dir" \
-                --chat-id "$TELEGRAM_CHAT_ID" \
-                --bot-token "$TELEGRAM_BOT_TOKEN"
-            fi
-          done
+          if [ -d "outputs/jobs" ]; then
+            for dir in outputs/jobs/*/; do
+              if [ -d "$dir" ]; then
+                echo "Sending $dir to Telegram ..."
+                python telegram_sender.py --dir "$dir" \
+                  --chat-id "$TELEGRAM_CHAT_ID" \
+                  --bot-token "$TELEGRAM_BOT_TOKEN" || echo "⚠️  Telegram send failed for $dir"
+              fi
+            done
+          else
+            echo "⚠️  No output to send to Telegram"
+          fi
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: reading-videos-${{ github.run_id }}
+          name: reading-videos-${{ matrix.level }}-${{ github.run_id }}
           path: outputs/jobs/**
           retention-days: 30
+
+  # ==============================================================
+  # JOB 3: dry-run — only runs when dry_run=true
+  # ==============================================================
+  dry-run:
+    name: 🔬 Dry-run report
+    needs: [validate]
+    if: fromJSON(needs.validate.outputs.dry_run) == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies (minimal)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Print config overview
+        shell: bash
+        run: |
+          echo "## 🔬 Dry-run report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Input parameters" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Parameter | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Levels | ${{ needs.validate.outputs.levels }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Count/level | ${{ needs.validate.outputs.count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Duration | ${{ needs.validate.outputs.duration }}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| TTS speed | ${{ needs.validate.outputs.tts_speed }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Topic | ${{ inputs.topic || '(random)' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Seed | ${{ inputs.seed || '(random)' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Background source | config.yaml |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Slideshow | ${{ inputs.use_slideshow || 'false' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Narration | ${{ inputs.enable_narration || 'true' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Auto-upload TikTok | ${{ inputs.auto_upload_tiktok || 'false' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Send Telegram | ${{ inputs.send_telegram || 'true' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Total videos to generate: **$(( $(echo '${{ needs.validate.outputs.levels }}' | python -c "import json,sys; print(len(json.load(sys.stdin)))") * ${{ needs.validate.outputs.count }} ))**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Dry-run complete. No videos generated." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Print example CLI command
+        shell: bash
+        run: |
+          echo "Equivalent local command:"
+          echo '```'
+          echo "python -m app.main batch --count ${{ needs.validate.outputs.count }} --level A1 --duration ${{ needs.validate.outputs.duration }}"
+          echo '```'
+
+  # ==============================================================
+  # JOB 4: summary — merge all level summaries into one report
+  # ==============================================================
+  summary:
+    name: 📊 Summary
+    needs: [validate, generate]
+    if: always() && fromJSON(needs.validate.outputs.dry_run) == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write final summary
+        shell: bash
+        run: |
+          {
+            echo "# 📊 Generation Summary"
+            echo ""
+            echo "**Workflow:** ${{ github.workflow }}"
+            echo "**Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo ""
+            echo "### Parameters"
+            echo "| Level | Count | Duration | TTS | Topic |"
+            echo "|-------|-------|----------|-----|-------|"
+            echo "| ${{ inputs.level || 'B1' }} | ${{ inputs.count || 1 }} | ${{ inputs.duration || 120 }}s | ${{ inputs.tts_speed || 1.0 }} | ${{ inputs.topic || 'random' }} |"
+            echo ""
+            echo "### Results by level"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Check which matrix jobs succeeded
+          for level in $(echo '${{ needs.validate.outputs.levels }}' | python -c "import json,sys; print(' '.join(json.load(sys.stdin)))"); do
+            echo "- **$level:** see artifacts \`reading-videos-$level-${{ github.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          {
+            echo ""
+            echo "### 📎 Artifacts"
+            echo "Download generated videos from the **Artifacts** section above."
+            echo ""
+            echo "---"
+            echo "_Generated by reading_reels workflow_"
+          } >> "$GITHUB_STEP_SUMMARY"
