@@ -189,20 +189,20 @@ class Renderer:
                         fw = draw.textlength(first_word, font=font)
                         # Draw first word in highlight color
                         if glow:
-                            self._draw_glow(draw, x, y, first_word, font, lvl_highlight + (120,), 6)
+                            self._draw_glow(draw, x, y, first_word, font, lvl_highlight, 6)
                         if shadow:
                             draw.text((x + soff, y + soff), first_word, font=font,
-                                      fill=shadow_clr + (180,), stroke_width=sw, stroke_fill=shadow_clr + (180,))
+                                      fill=shadow_clr + (180,), stroke_width=0)
                         draw.text((x, y), first_word, font=font,
                                   fill=lvl_highlight + (entrance_alpha,),
                                   stroke_width=sw, stroke_fill=stroke + (entrance_alpha,))
                         # Rest of text normal
                         x2 = x + fw
                         if glow:
-                            self._draw_glow(draw, x2, y, rest, font, glow_clr + (100,), glow_rad)
+                            self._draw_glow(draw, x2, y, rest, font, glow_clr, glow_rad)
                         if shadow:
                             draw.text((x2 + soff, y + soff), rest, font=font,
-                                      fill=shadow_clr + (180,), stroke_width=sw, stroke_fill=shadow_clr + (180,))
+                                      fill=shadow_clr + (180,), stroke_width=0)
                         draw.text((x2, y), rest, font=font, fill=actual_fill,
                                   stroke_width=sw, stroke_fill=stroke + (entrance_alpha,))
                         y += line_h
@@ -210,26 +210,19 @@ class Renderer:
                     else:
                         use_highlight = True
 
-                # Glow effect
+                # Glow effect (subtle, behind everything)
                 if glow:
-                    self._draw_glow(draw, x, y, sub, font, glow_clr + (100,), glow_rad)
+                    self._draw_glow(draw, x, y, sub, font, glow_clr, glow_rad)
 
-                # Shadow
+                # Shadow (clean, no stroke—main text provides it)
                 if shadow:
                     draw.text((x + soff, y + soff), sub, font=font,
-                              fill=shadow_clr + (180,), stroke_width=sw, stroke_fill=shadow_clr + (180,))
+                              fill=shadow_clr + (180,), stroke_width=0)
 
-                # Main text - with gradient for body, solid for intro
-                if use_gradient and not is_intro:
-                    # Draw gradient text by overlaying color bands
-                    self._draw_gradient_text(draw, x, y, sub, font,
-                                            grad_top + (entrance_alpha,),
-                                            grad_bot + (entrance_alpha,),
-                                            line_h)
-                else:
-                    tf = lvl_highlight + (entrance_alpha,) if (use_highlight and is_intro) else actual_fill
-                    draw.text((x, y), sub, font=font, fill=tf,
-                              stroke_width=sw, stroke_fill=stroke + (entrance_alpha,))
+                # Main text — always solid (gradient removed: caused overlapping layers)
+                tf = lvl_highlight + (entrance_alpha,) if (use_highlight and is_intro) else actual_fill
+                draw.text((x, y), sub, font=font, fill=tf,
+                          stroke_width=sw, stroke_fill=stroke + (entrance_alpha,))
                 y += line_h
             y += block_gap + (48 if is_intro else 0)
 

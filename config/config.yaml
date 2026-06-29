@@ -26,15 +26,14 @@ text:
   block_spacing: 48        # extra px between separate sentences/blocks
   side_margin: 72          # left/right safe margin in px
   text_color: "#FFFFFF"
-  text_gradient: true      # enable gradient text effect (top->bottom fade)
-  text_gradient_colors: ["#FFFFFF", "#E0E0FF"]  # top to bottom gradient
+  text_gradient: false      # gradient draws text 5× overlapping; glow+shadow+highlight is cleaner
   stroke_color: "#000000"
   stroke_width: 5          # outline for contrast over any background
   shadow: true
-  shadow_offset: 4
+  shadow_offset: 3
   glow: true               # subtle glow behind text for extra pop
   glow_color: "#4488FF"    # blue glow
-  glow_radius: 8           # glow spread in px
+  glow_radius: 4           # glow spread in px (lower = cleaner)
   scroll_direction: "up"   # "up" (credit scroll) or "static"
   start_offset_frac: 0.10  # where the top of the strip starts (fraction of height)
   end_visible_frac: 0.82   # keep last line above this fraction at the end
