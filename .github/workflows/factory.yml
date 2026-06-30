@@ -252,10 +252,11 @@ jobs:
             echo "### 🏭 Niche: ${{ matrix.niche }}"
             echo "- Count: ${{ needs.validate.outputs.count }}"
             echo "- Seed: ${{ inputs.seed || '(random)' }}"
-            if [ -d "outputs/jobs" ]; then
-              echo "- Jobs: $(ls -d outputs/jobs/*/ 2>/dev/null | wc -l)"
-              echo "- Output: \`outputs/jobs/\`"
-              for d in outputs/jobs/*/; do
+            OUT_DIR="outputs/factory"
+            if [ -d "outputs/factory" ]; then
+              echo "- Jobs: $(ls -d outputs/factory/*/ 2>/dev/null | wc -l)"
+              echo "- Output: \`outputs/factory/\`"
+              for d in outputs/factory/*/; do
                 if [ -f "$d/metadata.json" ]; then
                   NAME=$(python -c "import json; print(json.load(open('${d}metadata.json')).get('filename','?'))")
                   echo "  - ✅ $NAME"
@@ -277,8 +278,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ inputs.telegram_chat_override || secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -d "outputs/jobs" ]; then
-            for dir in outputs/jobs/*/; do
+          OUT_DIR="outputs/factory"
+          if [ -d "$OUT_DIR" ]; then
+            for dir in "$OUT_DIR"/*/; do
               if [ -d "$dir" ]; then
                 echo "Sending $dir to Telegram ..."
                 python telegram_sender.py --dir "$dir" \
@@ -295,7 +297,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: factory-${{ matrix.niche }}-${{ github.run_id }}
-          path: outputs/jobs/**
+          path: outputs/factory/**
           retention-days: 30
 
   # ==============================================================

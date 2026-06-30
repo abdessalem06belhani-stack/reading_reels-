@@ -137,10 +137,12 @@ class TikTokFactory:
         return results
 
     def generate_niche_batch(self, niche: str, count: int = 3,
-                             with_audio: bool = True) -> List[Dict]:
+                             with_audio: bool = True,
+                             prefer_video_bg: bool = True) -> List[Dict]:
         """Generate multiple videos for ONE specific niche."""
         return self.generate_batch(
-            count=count, niche=niche, with_audio=with_audio
+            count=count, niche=niche, with_audio=with_audio,
+            prefer_video_bg=prefer_video_bg
         )
 
     # ── Internal ────────────────────────────────────────────────

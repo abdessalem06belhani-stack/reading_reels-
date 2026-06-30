@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "instructions": ["AGENTS.md"],
+
+  "plugin": [
+    "oh-my-openagent@latest"
+  ],
+
+  "references": {
+    "docs": {
+      "path": "docs",
+      "description": "وثائق مشروع reading_reels: الإعداد، الاستخدام، النشر"
+    },
+    "config": {
+      "path": "config",
+      "description": "ملفات YAML: video parameters, levels, topics, accounts"
+    },
+    "agents": {
+      "path": "agents",
+      "description": "كود agents pipeline"
+    }
+  }
+}

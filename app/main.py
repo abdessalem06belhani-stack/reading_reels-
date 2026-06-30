@@ -129,16 +129,18 @@ def cmd_factory_batch(cfg, args):
         print("ERROR: tiktok_factory not installed. Run: pip install -r requirements.txt")
         return
     factory = TikTokFactory(cfg)
+    prefer_video = not args.no_video
     if args.niche:
         results = factory.generate_niche_batch(args.niche, count=args.count,
-                                               with_audio=not args.no_audio)
+                                               with_audio=not args.no_audio,
+                                               prefer_video_bg=prefer_video)
     else:
         results = factory.generate_batch(count=args.count, niche=None,
-                                         with_audio=not args.no_audio)
-    print(f"\n✅ Factory generated {len(results)}/{args.count} videos:")
+                                         with_audio=not args.no_audio,
+                                         prefer_video_bg=prefer_video)
+    print(f"\nFactory generated {len(results)}/{args.count} videos:")
     for r in results:
-        print(f"   • {r['niche_emoji'] if 'niche_emoji' in r else '📹'} "
-              f"[{r['niche']}] {r['video']}")
+        print(f"   [{r['niche']}] {r['video']}")
 
 
 def cmd_factory_report(cfg, args):
@@ -215,7 +217,13 @@ def build_parser():
         fb.add_argument("--count", type=int, default=3)
         fb.add_argument("--niche", default=None, choices=SUPPORTED_NICHES,
                         help="specific niche (random if omitted)")
+        fb.add_argument("--seed", type=int, default=None,
+                        help="random seed for reproducibility")
         fb.add_argument("--no-audio", action="store_true")
+        fb.add_argument("--no-video", action="store_true",
+                        help="use images instead of video background")
+        fb.add_argument("--gradient-only", action="store_true",
+                        help="force gradient background (no API calls)")
         fb.set_defaults(fn=cmd_factory_batch)
 
         # ── Factory: report ──
