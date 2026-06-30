@@ -6,7 +6,7 @@ from __future__ import annotations
 import json, random
 from pathlib import Path
 from typing import Dict, List, Optional
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from app.utils import get_logger, run_ffmpeg, ensure_dir, timestamp
 
