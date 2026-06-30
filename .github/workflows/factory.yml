@@ -1,0 +1,390 @@
+# =====================================================================
+# reading_reels — TikTok AI Factory: niche-based short video generation
+# Trigger: manual (workflow_dispatch) or daily cron (06:00 / 14:00 UTC)
+# =====================================================================
+name: tiktok-factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      # ================================================================
+      # 🎯 NICHE & CONTENT
+      # ================================================================
+      niche:
+        description: '🎯 Niche to generate'
+        required: true
+        default: 'finance'
+        type: choice
+        options:
+          - 'auto (random per video)'
+          - 'finance'
+          - 'ai_tools'
+          - 'real_estate'
+          - 'health_biohacking'
+          - 'productivity'
+      count:
+        description: 'Number of videos'
+        required: true
+        default: '3'
+        type: choice
+        options: ['1', '2', '3', '5', '10', '20']
+      seed:
+        description: 'Random seed (blank = random)'
+        required: false
+        default: ''
+        type: string
+
+      # ================================================================
+      # 🔊 AUDIO
+      # ================================================================
+      enable_audio:
+        description: 'Voice narration (Edge-TTS)'
+        required: false
+        default: true
+        type: boolean
+
+      # ================================================================
+      # 🖼️ BACKGROUND
+      # ================================================================
+      background_mode:
+        description: 'Background style'
+        required: true
+        default: 'video'
+        type: choice
+        options:
+          - 'video (HD stock clips)'
+          - 'slideshow (multiple images)'
+          - 'gradient (generated, no key needed)'
+
+      # ================================================================
+      # 📤 PUBLISHING
+      # ================================================================
+      send_telegram:
+        description: 'Send result videos to Telegram'
+        required: true
+        default: true
+        type: boolean
+      telegram_chat_override:
+        description: 'Telegram chat ID (blank = secret)'
+        required: false
+        default: ''
+        type: string
+
+      # ================================================================
+      # 🧪 ADVANCED
+      # ================================================================
+      dry_run:
+        description: '🔬 Dry-run: validate without generating'
+        required: false
+        default: false
+        type: boolean
+
+  schedule:
+    - cron: "0 6 * * *"    # 06:00 UTC daily
+    - cron: "0 14 * * *"   # 14:00 UTC daily
+
+  workflow_call:
+    inputs:
+      niche:
+        required: false
+        type: string
+        default: ''
+      count:
+        required: false
+        type: number
+        default: 3
+      send_telegram:
+        required: false
+        type: boolean
+        default: false
+
+# ---------------------------------------------------------------
+# CONCURRENCY — cancel overlapping runs from the same branch
+# ---------------------------------------------------------------
+concurrency:
+  group: factory-${{ github.ref }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------
+# ENV defaults
+# ---------------------------------------------------------------
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ==============================================================
+  # JOB 1: validate — check inputs BEFORE spending CI minutes
+  # ==============================================================
+  validate:
+    name: 🔍 Validate inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      niches: ${{ steps.resolve-niches.outputs.niches }}
+      niches_json: ${{ steps.resolve-niches.outputs.niches_json }}
+      dry_run: ${{ steps.parse-inputs.outputs.dry_run }}
+      count: ${{ steps.parse-inputs.outputs.count }}
+      background_flag: ${{ steps.parse-inputs.outputs.background_flag }}
+      audio_flag: ${{ steps.parse-inputs.outputs.audio_flag }}
+    steps:
+      - name: Resolve niches
+        id: resolve-niches
+        shell: bash
+        run: |
+          INPUT_NICHE="${{ inputs.niche || 'auto (random per video)' }}"
+
+          if [ "$INPUT_NICHE" = "auto (random per video)" ]; then
+            NICHES='["finance","ai_tools","real_estate","health_biohacking","productivity"]'
+          else
+            NICHES="[\"$INPUT_NICHE\"]"
+          fi
+
+          echo "niches=$NICHES" | tee -a "$GITHUB_OUTPUT"
+          echo "niches_json=$NICHES" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Parse numeric & flag inputs
+        id: parse-inputs
+        shell: bash
+        run: |
+          CNT=${{ inputs.count || 3 }}
+          if [ "$CNT" -lt 1 ] 2>/dev/null; then CNT=1; fi
+          if [ "$CNT" -gt 30 ] 2>/dev/null; then CNT=30; fi
+          echo "count=$CNT" | tee -a "$GITHUB_OUTPUT"
+
+          # Background mode → CLI flags
+          BG="${{ inputs.background_mode || 'video (HD stock clips)' }}"
+          case "$BG" in
+            "slideshow (multiple images)") echo "background_flag=--no-video" | tee -a "$GITHUB_OUTPUT" ;;
+            "gradient (generated, no key needed)") echo "background_flag=--no-video --gradient-only" | tee -a "$GITHUB_OUTPUT" ;;
+            *) echo "background_flag=" | tee -a "$GITHUB_OUTPUT" ;;
+          esac
+
+          # Audio
+          if [ "${{ inputs.enable_audio || 'true' }}" = "false" ]; then
+            echo "audio_flag=--no-audio" | tee -a "$GITHUB_OUTPUT"
+          else
+            echo "audio_flag=" | tee -a "$GITHUB_OUTPUT"
+          fi
+
+          DRY="${{ inputs.dry_run || 'false' }}"
+          echo "dry_run=$DRY" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Print validated parameters
+        shell: bash
+        run: |
+          echo "### ✅ Factory params validated" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Niche(s): ${{ steps.resolve-niches.outputs.niches }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Count: ${{ inputs.count || 3 }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Background: ${{ inputs.background_mode || 'video' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Audio: ${{ inputs.enable_audio || 'true' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dry-run: ${{ inputs.dry_run || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ==============================================================
+  # JOB 2: generate — matrix over resolved niches
+  # ==============================================================
+  generate:
+    name: 🏭 ${{ matrix.niche }}
+    needs: [validate]
+    if: fromJSON(needs.validate.outputs.dry_run) == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        niche: ${{ fromJSON(needs.validate.outputs.niches_json) }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore dedup DB
+        uses: actions/cache@v6
+        with:
+          path: assets/used_assets.json
+          key: used-assets-${{ github.run_id }}-${{ matrix.niche }}
+          restore-keys: used-assets-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+
+      - name: Doctor check
+        run: python -m app.main doctor
+
+      - name: Generate factory videos — ${{ matrix.niche }}
+        id: generate
+        shell: bash
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          ARGS="factory-batch --niche ${{ matrix.niche }} --count ${{ needs.validate.outputs.count }}"
+
+          # Optional seed
+          if [ -n "${{ inputs.seed }}" ]; then
+            ARGS="$ARGS --seed ${{ inputs.seed }}"
+          fi
+
+          # Background & audio flags
+          BG_FLAG="${{ needs.validate.outputs.background_flag }}"
+          if [ -n "$BG_FLAG" ]; then
+            ARGS="$ARGS $BG_FLAG"
+          fi
+          AUDIO_FLAG="${{ needs.validate.outputs.audio_flag }}"
+          if [ -n "$AUDIO_FLAG" ]; then
+            ARGS="$ARGS $AUDIO_FLAG"
+          fi
+
+          echo "Running: python -m app.main $ARGS"
+          python -m app.main $ARGS
+
+      - name: Generate step summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### 🏭 Niche: ${{ matrix.niche }}"
+            echo "- Count: ${{ needs.validate.outputs.count }}"
+            echo "- Seed: ${{ inputs.seed || '(random)' }}"
+            if [ -d "outputs/jobs" ]; then
+              echo "- Jobs: $(ls -d outputs/jobs/*/ 2>/dev/null | wc -l)"
+              echo "- Output: \`outputs/jobs/\`"
+              for d in outputs/jobs/*/; do
+                if [ -f "$d/metadata.json" ]; then
+                  NAME=$(python -c "import json; print(json.load(open('${d}metadata.json')).get('filename','?'))")
+                  echo "  - ✅ $NAME"
+                elif [ -f "$d/caption.txt" ]; then
+                  echo "  - ✅ $(basename $d)"
+                fi
+              done
+            else
+              echo "- ⚠️  No output directory"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send to Telegram
+        if: |
+          always()
+          && github.event_name == 'workflow_dispatch'
+          && fromJSON(github.event.inputs.send_telegram || 'true')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ inputs.telegram_chat_override || secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -d "outputs/jobs" ]; then
+            for dir in outputs/jobs/*/; do
+              if [ -d "$dir" ]; then
+                echo "Sending $dir to Telegram ..."
+                python telegram_sender.py --dir "$dir" \
+                  --chat-id "$TELEGRAM_CHAT_ID" \
+                  --bot-token "$TELEGRAM_BOT_TOKEN" || echo "⚠️  Telegram send failed for $dir"
+              fi
+            done
+          else
+            echo "⚠️  No output to send to Telegram"
+          fi
+
+      - name: Upload artifacts — ${{ matrix.niche }}
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: factory-${{ matrix.niche }}-${{ github.run_id }}
+          path: outputs/jobs/**
+          retention-days: 30
+
+  # ==============================================================
+  # JOB 3: dry-run — only when dry_run=true
+  # ==============================================================
+  dry-run:
+    name: 🔬 Dry-run report
+    needs: [validate]
+    if: fromJSON(needs.validate.outputs.dry_run) == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deps (minimal)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Print factory config overview
+        shell: bash
+        run: |
+          echo "## 🔬 Factory dry-run report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Input parameters" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Parameter | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Niche(s) | ${{ needs.validate.outputs.niches }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Count | ${{ needs.validate.outputs.count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Background | ${{ inputs.background_mode || 'video' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Audio | ${{ inputs.enable_audio || 'true' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Seed | ${{ inputs.seed || '(random)' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Send Telegram | ${{ inputs.send_telegram || 'true' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          COUNT=${{ needs.validate.outputs.count }}
+          echo "### Total videos to generate: **$COUNT**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Dry-run complete. No videos generated." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Print CLI equivalent
+        shell: bash
+        run: |
+          echo "Equivalent local command:"
+          echo '```'
+          echo "python -m app.main factory-batch --niche finance --count ${{ needs.validate.outputs.count }}"
+          echo '```'
+
+  # ==============================================================
+  # JOB 4: summary — merge all niche summaries
+  # ==============================================================
+  summary:
+    name: 📊 Summary
+    needs: [validate, generate]
+    if: always() && fromJSON(needs.validate.outputs.dry_run) == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write final summary
+        shell: bash
+        run: |
+          {
+            echo "# 🏭 TikTok AI Factory Summary"
+            echo ""
+            echo "**Workflow:** ${{ github.workflow }}"
+            echo "**Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo ""
+            echo "### Parameters"
+            echo "| Niche(s) | Count | Background | Audio | Seed |"
+            echo "|----------|-------|------------|-------|------|"
+            echo "| ${{ inputs.niche || 'auto' }} | ${{ inputs.count || 3 }} | ${{ inputs.background_mode || 'video' }} | ${{ inputs.enable_audio || 'true' }} | ${{ inputs.seed || 'random' }} |"
+            echo ""
+            echo "### Results by niche"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for niche in $(echo '${{ needs.validate.outputs.niches }}' | python -c "import json,sys; print(' '.join(json.load(sys.stdin)))"); do
+            echo "- **$niche:** see artifacts \`factory-$niche-${{ github.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          {
+            echo ""
+            echo "### 📎 Artifacts"
+            echo "Download generated videos from the **Artifacts** section above."
+            echo ""
+            echo "---"
+            echo "_Generated by tiktok-factory workflow_"
+          } >> "$GITHUB_STEP_SUMMARY"

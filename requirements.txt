@@ -10,6 +10,7 @@ python-dotenv>=1.0.0      # load .env
 # ---- Text-to-speech (optional, free) ----
 gTTS>=2.5.0               # online, very natural, free (needs internet)
 pyttsx3>=2.90             # offline fallback TTS (no internet, robotic)
+edge-tts>=6.0.0           # Microsoft Edge TTS — AI voices, natural, multilingual, free
 
 # ---- Auto-upload to TikTok (optional) ----
 selenium>=4.15.0          # browser-automation upload (uses your own Chrome login)

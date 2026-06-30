@@ -21,6 +21,13 @@ from app.config_loader import load_config
 from app.pipeline import Pipeline
 from app.utils import get_logger, ffmpeg_bin
 
+# TikTok Factory — اختياري، silent if not installed
+try:
+    from tiktok_factory.factory import TikTokFactory, SUPPORTED_NICHES
+    _HAS_FACTORY = True
+except ImportError:
+    _HAS_FACTORY = False
+
 log = get_logger()
 
 
@@ -98,6 +105,51 @@ def cmd_upload(cfg, args):
     print(json.dumps(res, indent=2))
 
 
+# ─── TikTok Factory CLI ─────────────────────────────────────────
+def cmd_factory_one(cfg, args):
+    """Generate one factory video for a given niche."""
+    if not _HAS_FACTORY:
+        print("ERROR: tiktok_factory not installed. Run: pip install -r requirements.txt")
+        return
+    factory = TikTokFactory(cfg)
+    res = factory.generate(
+        niche_key=args.niche,
+        seed=args.seed,
+        with_audio=not args.no_audio,
+        prefer_video_bg=not args.no_video,
+    )
+    keys = ("video", "job_dir", "niche", "niche_name", "duration", "script_source")
+    out = {k: res[k] for k in keys}
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+
+
+def cmd_factory_batch(cfg, args):
+    """Generate multiple factory videos."""
+    if not _HAS_FACTORY:
+        print("ERROR: tiktok_factory not installed. Run: pip install -r requirements.txt")
+        return
+    factory = TikTokFactory(cfg)
+    if args.niche:
+        results = factory.generate_niche_batch(args.niche, count=args.count,
+                                               with_audio=not args.no_audio)
+    else:
+        results = factory.generate_batch(count=args.count, niche=None,
+                                         with_audio=not args.no_audio)
+    print(f"\n✅ Factory generated {len(results)}/{args.count} videos:")
+    for r in results:
+        print(f"   • {r['niche_emoji'] if 'niche_emoji' in r else '📹'} "
+              f"[{r['niche']}] {r['video']}")
+
+
+def cmd_factory_report(cfg, args):
+    """Show niches report."""
+    if not _HAS_FACTORY:
+        print("ERROR: tiktok_factory not installed.")
+        return
+    factory = TikTokFactory(cfg)
+    print(factory.niche_report())
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="reading_reels",
                                 description="Free-first TikTok English reading video generator")
@@ -146,6 +198,30 @@ def build_parser():
     u.add_argument("--caption-file", default=None)
     u.add_argument("--caption", default=None)
     u.set_defaults(fn=cmd_upload)
+
+    if _HAS_FACTORY:
+        # ── Factory: one ──
+        fo = sub.add_parser("factory-one", help="generate one factory video for a niche")
+        fo.add_argument("--niche", default="finance",
+                        choices=SUPPORTED_NICHES,
+                        help="niche to generate (finance, ai_tools, real_estate, health_biohacking, productivity)")
+        fo.add_argument("--seed", type=int, default=None)
+        fo.add_argument("--no-audio", action="store_true")
+        fo.add_argument("--no-video", action="store_true", help="use images instead of video background")
+        fo.set_defaults(fn=cmd_factory_one)
+
+        # ── Factory: batch ──
+        fb = sub.add_parser("factory-batch", help="generate multiple factory videos")
+        fb.add_argument("--count", type=int, default=3)
+        fb.add_argument("--niche", default=None, choices=SUPPORTED_NICHES,
+                        help="specific niche (random if omitted)")
+        fb.add_argument("--no-audio", action="store_true")
+        fb.set_defaults(fn=cmd_factory_batch)
+
+        # ── Factory: report ──
+        fr = sub.add_parser("factory-report", help="show factory niches report")
+        fr.set_defaults(fn=cmd_factory_report)
+
     return p
 
 

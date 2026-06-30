@@ -1,0 +1,134 @@
+# =====================================================================
+#  TikTok AI Factory — Master Configuration (يونيو 2026)
+#  تكوين المصنع الآلي لفيديوهات التيك توك
+# =====================================================================
+
+# ── General ──────────────────────────────────────────────────────
+factory:
+  enabled: true
+  default_niche: "finance"
+  default_language: "en"
+  output_dir: "outputs/factory"
+  max_daily_per_niche: 10
+  schedule: "daily 09:00"          # cron format
+
+# ── Video Output ─────────────────────────────────────────────────
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  min_duration_sec: 110            # ~2 minutes
+  max_duration_sec: 130
+  target_duration_sec: 120
+  crf: 17                          # أفضل جودة (0-51, أقل = أفضل)
+  preset: "slow"                   # ffmpeg x264 preset
+  pix_fmt: "yuv420p"
+  bitrate: "10000k"               # HD عالي الجودة
+  max_bitrate: "15000k"
+  audio_bitrate: "192k"
+  profile: "high"
+  level: "4.1"
+  tune: "stillimage"
+
+# ── Text Overlay ─────────────────────────────────────────────────
+text:
+  font_regular: "fonts/Lexend-Regular.ttf"
+  font_bold: "fonts/Lexend-Bold.ttf"
+  intro_font_size: 78
+  body_font_size: 54
+  line_spacing: 1.35
+  block_spacing: 48
+  side_margin: 72
+  stroke_color: "#000000"
+  stroke_width: 5
+  shadow: true
+  shadow_offset: 3
+  glow: true
+  glow_radius: 4
+  scroll_direction: "up"
+  start_offset_frac: 0.10
+  end_visible_frac: 0.82
+  entrance_animation: "fade"
+  highlight_keywords: true
+
+# ── Audio ────────────────────────────────────────────────────────
+audio:
+  # TTS engine priority: edge_tts (best) > gtts > pyttsx3 > silent
+  tts_engine: "auto"            # auto, edge_tts, gtts, pyttsx3, silent
+  edge_tts_voice: "en-US-JennyNeural"  # default, overridden per niche
+  edge_tts_rate: "+0%"
+  edge_tts_pitch: "+0Hz"
+  tts_lang: "en"
+  tts_tld: "com"
+  intro_tts: true
+  narrate_text: true            # قراءة النص كاملاً بصوت AI (يزيد retention)
+  narrate_speed: 0.95           # سرعة قراءة النص (أبطأ قليلاً للوضوح)
+  music_file: ""
+  music_gain_db: -25
+  voice_gain_db: 0
+  loudnorm: true
+
+# ── Background Visuals ───────────────────────────────────────────
+background:
+  source_priority: ["pexels", "pixabay", "gradient"]
+  media_type: "video"            # video > image > auto (فيديو يزيد retention)
+  orientation: "portrait"
+  image_quality: "high"
+  video_quality: "high"
+  kenburns: true
+  kenburns_zoom: 1.08
+  slideshow_enabled: true
+  slideshow_image_count: 8
+  enhance_image: true
+  sharpen_amount: 0.3
+  contrast_boost: 1.05
+  saturation_boost: 1.10
+  # إضافة تأثيرات بصرية جذابة
+  transitions: true              # انتقالات بين المشاهد
+  transition_duration: 0.5       # مدة الانتقال بالثواني
+  overlay_effects: true          # تأثيرات تراكب (نص متحرك، خلفيات)
+  particle_effects: false        # تأثيرات جسيمات (خفيفة جداً)
+  cache_dir: "assets/factory_cache"
+  dedup: true
+
+# ── LLM Script Generation ────────────────────────────────────────
+ai:
+  provider: "nvidia_nim"         # nvidia_nim, local, openrouter
+  base_url: "https://integrate.api.nvidia.com/v1"
+  model: "meta/llama-3.1-70b-instruct"
+  temperature: 0.85
+  max_tokens: 1500
+  timeout_sec: 90
+  retries: 2
+  fallback_to_local: true
+  # OpenRouter fallback (free models)
+  openrouter_model: "openai/gpt-4o-mini"
+  openrouter_base_url: "https://openrouter.ai/api/v1"
+
+# ── TikTok Upload ────────────────────────────────────────────────
+upload:
+  enabled: false
+  method: "web"                  # web, api
+  schedule_hours: [9, 12, 15, 18, 21]  # أوقات النشر المثلى
+  max_per_day: 5
+  min_interval_minutes: 180      # 3 ساعات بين الفيديوهات
+  web:
+    upload_url: "https://www.tiktok.com/tiktokstudio/upload"
+    chrome_profile_dir: "assets/chrome_profile"
+    headless: false
+    post_button_timeout: 180
+    post_finalize_wait: 12
+
+# ── Scheduling ──────────────────────────────────────────────────
+scheduling:
+  enabled: true
+  global_max_daily: 50
+  niche_rotation: true           # تناوب النيشات يومياً
+  auto_retry_failed: true
+  notification_channel: "telegram"  # telegram, email, none
+  # إعدادات الـ Consistency (مهم للخوارزمية)
+  optimal_posting_times:
+    - "06:00-08:00"             # الصباح الباكر
+    - "11:00-13:00"             # فترة الغداء
+    - "18:00-21:00"             # المساء - ذروة التفاعل
+  timezone: "America/New_York"
